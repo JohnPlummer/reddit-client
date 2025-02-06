@@ -43,8 +43,13 @@ type Post struct {
 }
 
 // GetSubredditPosts fetches posts from a subreddit.
-func (c *Client) GetSubredditPosts(subreddit string) ([]Post, error) {
-	resp, err := c.request(fmt.Sprintf("/r/%s/hot", subreddit))
+func (c *Client) GetSubredditPosts(subreddit, sort string) ([]Post, error) {
+	// Default to "hot" if sort is empty
+	if sort == "" {
+		sort = "new"
+	}
+
+	resp, err := c.request(fmt.Sprintf("/r/%s/%s", subreddit, sort))
 	if err != nil {
 		return nil, err
 	}
@@ -57,9 +62,9 @@ func (c *Client) GetSubredditPosts(subreddit string) ([]Post, error) {
 	for _, item := range data["data"].(map[string]interface{})["children"].([]interface{}) {
 		postData := item.(map[string]interface{})["data"].(map[string]interface{})
 		post := Post{
-			Title:    postData["title"].(string),
-			SelfText: postData["selftext"].(string), // Empty for link posts
-			URL:      postData["url"].(string),
+			Title:   postData["title"].(string),
+			SelfText: postData["selftext"].(string),
+			URL:     postData["url"].(string),
 		}
 		posts = append(posts, post)
 	}

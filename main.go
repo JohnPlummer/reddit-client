@@ -26,8 +26,8 @@ func main() {
 		log.Fatalf("Error initializing Reddit client: %v", err)
 	}
 
-	// Fetch posts from a subreddit
-	posts, err := client.GetSubredditPosts("golang")
+	// Fetch posts with a specific sorting option
+	posts, err := client.GetSubredditPosts("golang", "new") // Change "new" to "top", "rising", or "hot"
 	if err != nil || len(posts) == 0 {
 		log.Fatalf("Error fetching posts: %v", err)
 	}
