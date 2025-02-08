@@ -2,7 +2,6 @@ package reddit
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,7 +10,17 @@ import (
 	"time"
 )
 
-const tokenURL = "https://www.reddit.com/api/v1/access_token"
+const (
+	tokenURL      = "https://www.reddit.com/api/v1/access_token"
+	tokenLifetime = time.Hour // Reddit tokens typically last 1 hour
+)
+
+// TokenResponse represents the Reddit OAuth token response
+type TokenResponse struct {
+	AccessToken string `json:"access_token"`
+	TokenType   string `json:"token_type"`
+	ExpiresIn   int    `json:"expires_in"`
+}
 
 type Auth struct {
 	ClientID     string
@@ -20,39 +29,60 @@ type Auth struct {
 	ExpiresAt    time.Time
 }
 
+// IsTokenExpired checks if the current token is expired or about to expire
+func (a *Auth) IsTokenExpired() bool {
+	return time.Now().Add(time.Minute).After(a.ExpiresAt)
+}
+
 // Authenticate with app-only authentication (client credentials flow)
 func (a *Auth) Authenticate() error {
 	data := url.Values{}
-	data.Set("grant_type", "client_credentials") // Use app-only auth
+	data.Set("grant_type", "client_credentials")
 
-	req, _ := http.NewRequest("POST", tokenURL, strings.NewReader(data.Encode()))
+	req, err := http.NewRequest("POST", tokenURL, strings.NewReader(data.Encode()))
+	if err != nil {
+		return fmt.Errorf("creating auth request: %w", err)
+	}
+
 	req.SetBasicAuth(a.ClientID, a.ClientSecret)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("User-Agent", "golang:reddit-client:v1.0 (by /u/yourusername)")
 
-	client := &http.Client{}
+	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
-		return err
+		return fmt.Errorf("making auth request: %w", err)
 	}
 	defer resp.Body.Close()
 
-	// Debugging: Print Reddit API response
-	body, _ := io.ReadAll(resp.Body)
-	fmt.Println("Reddit API Response:", string(body))
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("reading response body: %w", err)
+	}
 
 	if resp.StatusCode != http.StatusOK {
-		return errors.New("failed to authenticate with Reddit")
+		return fmt.Errorf("authentication failed with status %d: %s", resp.StatusCode, string(body))
 	}
 
-	var result map[string]interface{}
-	json.Unmarshal(body, &result)
-
-	if token, ok := result["access_token"].(string); ok {
-		a.Token = token
-		a.ExpiresAt = time.Now().Add(time.Duration(result["expires_in"].(float64)) * time.Second)
-		return nil
+	var tokenResp TokenResponse
+	if err := json.Unmarshal(body, &tokenResp); err != nil {
+		return fmt.Errorf("parsing token response: %w", err)
 	}
 
-	return errors.New("invalid response from Reddit API")
+	if tokenResp.AccessToken == "" {
+		return fmt.Errorf("no access token in response")
+	}
+
+	a.Token = tokenResp.AccessToken
+	a.ExpiresAt = time.Now().Add(time.Duration(tokenResp.ExpiresIn) * time.Second)
+
+	return nil
+}
+
+// EnsureValidToken checks if the token is expired and refreshes if necessary
+func (a *Auth) EnsureValidToken() error {
+	if a.IsTokenExpired() {
+		return a.Authenticate()
+	}
+	return nil
 }

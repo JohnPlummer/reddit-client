@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"github.com/JohnPlummer/reddit-client/reddit"
 	"github.com/joho/godotenv"
@@ -26,11 +27,12 @@ func main() {
 		log.Fatalf("Error initializing Reddit client: %v", err)
 	}
 
-	// Fetch posts with a specific sorting option
-	posts, err := client.GetSubredditPosts("golang", "new") // Change "new" to "top", "rising", or "hot"
-	if err != nil || len(posts) == 0 {
+	// Example: Fetch 50 posts
+	posts, err := reddit.GetSubreddit(client, "brighton", "new", 150)
+	if err != nil {
 		log.Fatalf("Error fetching posts: %v", err)
 	}
+	reddit.Print(posts)
 
 	// Display the first post
 	firstPost := posts[0]
@@ -38,21 +40,11 @@ func main() {
 	fmt.Println("URL:", firstPost.URL)
 	fmt.Println("\nFetching comments...\n")
 
-	// Extract post ID properly
-	postID, err := reddit.ExtractPostID(firstPost.URL)
+	// Example: Fetch posts created in the last 24 hours
+	oneDayAgo := time.Now().Unix() - 86400 // 24 hours ago
+	recentPosts, err := reddit.GetSubreddit(client, "golang", "hot", 50, reddit.Since(oneDayAgo))
 	if err != nil {
-		log.Fatalf("Failed to extract post ID: %v", err)
+		log.Fatalf("Error fetching recent posts: %v", err)
 	}
-
-	// Fetch comments
-	comments, err := client.GetPostComments("golang", postID)
-	if err != nil {
-		log.Fatalf("Error fetching comments: %v", err)
-	}
-
-	// Print comments
-	for _, comment := range comments {
-		fmt.Printf("%s: %s\n", comment.Author, comment.Body)
-		fmt.Println("----")
-	}
+	reddit.Print(recentPosts)
 }

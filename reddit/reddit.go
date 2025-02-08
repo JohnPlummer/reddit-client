@@ -1,5 +1,10 @@
 package reddit
 
+import (
+	"fmt"
+	"net/http"
+)
+
 // RedditClient embeds Client, automatically exposing its methods.
 type RedditClient struct {
 	Auth    *Auth
@@ -7,16 +12,26 @@ type RedditClient struct {
 }
 
 // NewClient initializes a Reddit API client using client credentials flow.
-func NewClient(clientID, clientSecret string) (*RedditClient, error) {
+func NewClient(clientID, clientSecret string, opts ...ClientOption) (*Client, error) {
+	client := &Client{
+		client:    &http.Client{},
+		userAgent: "golang:reddit-client:v1.0 (by /u/yourusername)", // default
+	}
+
+	// Apply options
+	for _, opt := range opts {
+		opt(client)
+	}
+
 	auth := &Auth{
 		ClientID:     clientID,
 		ClientSecret: clientSecret,
 	}
 
 	if err := auth.Authenticate(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("authentication failed: %w", err)
 	}
 
-	client := &Client{Auth: auth}
-	return &RedditClient{Auth: auth, Client: client}, nil
+	client.Auth = auth
+	return client, nil
 }
