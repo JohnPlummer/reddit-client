@@ -38,9 +38,18 @@ func (c *Client) request(endpoint string) (*http.Response, error) {
 	return resp, nil
 }
 
-// GetPostComments fetches comments for a given post
-func (c *Client) getComments(subreddit, postID string) ([]interface{}, error) {
-	resp, err := c.request(fmt.Sprintf("/r/%s/comments/%s", subreddit, postID))
+// GetComments fetches comments for a given post
+func (c *Client) GetComments(subreddit, postID string, params map[string]string) ([]interface{}, error) {
+	endpoint := fmt.Sprintf("/r/%s/comments/%s", subreddit, postID)
+	if len(params) > 0 {
+		endpoint += "?"
+		for k, v := range params {
+			endpoint += fmt.Sprintf("%s=%s&", k, v)
+		}
+		endpoint = endpoint[:len(endpoint)-1] // Remove trailing &
+	}
+
+	resp, err := c.request(endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -63,8 +72,8 @@ func WithUserAgent(userAgent string) ClientOption {
 	}
 }
 
-// getPosts fetches a single page of posts from a subreddit
-func (c *Client) getPosts(subreddit string, params map[string]string) ([]Post, string, error) {
+// GetPosts fetches a single page of posts from a subreddit
+func (c *Client) GetPosts(subreddit string, params map[string]string) ([]Post, string, error) {
 	endpoint := fmt.Sprintf("/r/%s.json", subreddit)
 	if len(params) > 0 {
 		endpoint += "?"
@@ -86,4 +95,16 @@ func (c *Client) getPosts(subreddit string, params map[string]string) ([]Post, s
 	}
 
 	return parsePosts(data)
+}
+
+// NewClient creates a new Reddit client
+func NewClient(auth *Auth, opts ...ClientOption) *Client {
+	c := &Client{
+		Auth:   auth,
+		client: &http.Client{},
+	}
+	for _, opt := range opts {
+		opt(c)
+	}
+	return c
 }

@@ -35,13 +35,6 @@ func (p Post) String() string {
 	)
 }
 
-// Print formats and prints a slice of posts to stdout
-func Print(posts []Post) {
-	fmt.Println("Posts:")
-	for i, post := range posts {
-		fmt.Printf("Post %d:\n%s\n", i+1, post)
-	}
-}
 
 // parsePost extracts a single post from the API response.
 func parsePost(item interface{}) (Post, error) {
@@ -101,50 +94,31 @@ func parsePosts(data map[string]interface{}) ([]Post, string, error) {
 	return posts, nextPage, nil
 }
 
-// SubredditOption is a function type for modifying subreddit request parameters
-type SubredditOption func(params map[string]string)
+// CommentOption is a function type for modifying comment request parameters
+type CommentOption func(params map[string]string)
 
-// GetSubreddit fetches a specific number of posts using pagination.
-func GetSubreddit(c *Client, subreddit, sort string, totalPosts int, opts ...SubredditOption) ([]Post, error) {
-	params := map[string]string{
-		"limit": "100",
-		"sort":  sort,
-	}
+// CommentGetter interface for fetching comments
+type CommentGetter interface {
+	GetComments(subreddit, postID string, params map[string]string) ([]interface{}, error)
+}
 
+// GetComments fetches comments for this post with optional filters
+func (p Post) GetComments(c CommentGetter, opts ...CommentOption) ([]Comment, error) {
+	params := make(map[string]string)
 	for _, opt := range opts {
 		opt(params)
 	}
 
-	var allPosts []Post
-	after := ""
-
-	for len(allPosts) < totalPosts {
-		if after != "" {
-			params["after"] = after
-		}
-
-		posts, nextPage, err := c.getPosts(subreddit, params)
-		if err != nil {
-			return nil, err
-		}
-
-		allPosts = append(allPosts, posts...)
-		if nextPage == "" || len(posts) == 0 {
-			break
-		}
-		after = nextPage
+	data, err := c.GetComments(p.Subreddit, p.ID, params)
+	if err != nil {
+		return nil, fmt.Errorf("fetching comments: %w", err)
 	}
-
-	if len(allPosts) > totalPosts {
-		allPosts = allPosts[:totalPosts]
-	}
-
-	return allPosts, nil
+	return parseComments(data)
 }
 
-// Since returns a SubredditOption that filters posts created after the given timestamp
-func Since(timestamp int64) SubredditOption {
+// CommentsSince returns a CommentOption that filters comments created after the given timestamp
+func CommentsSince(timestamp int64) CommentOption {
 	return func(params map[string]string) {
-		params["after"] = fmt.Sprintf("t3_%d", timestamp)
+		params["after"] = fmt.Sprintf("t1_%d", timestamp)
 	}
 }

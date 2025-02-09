@@ -4,47 +4,47 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"time"
 
 	"github.com/JohnPlummer/reddit-client/reddit"
 	"github.com/joho/godotenv"
 )
 
 func main() {
-	// Load .env file
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatalf("Error loading .env file")
+	if err := godotenv.Load(); err != nil {
+		log.Fatal("Error loading .env file")
 	}
 
-	// Retrieve credentials
-	clientID := os.Getenv("REDDIT_CLIENT_ID")
-	clientSecret := os.Getenv("REDDIT_CLIENT_SECRET")
-
-	// Initialize Reddit client
-	client, err := reddit.NewClient(clientID, clientSecret)
-	if err != nil {
-		log.Fatalf("Error initializing Reddit client: %v", err)
+	auth := &reddit.Auth{
+		ClientID:     os.Getenv("REDDIT_CLIENT_ID"),
+		ClientSecret: os.Getenv("REDDIT_CLIENT_SECRET"),
 	}
 
-	// Example: Fetch 50 posts
-	posts, err := reddit.GetSubreddit(client, "brighton", "new", 150)
-	if err != nil {
-		log.Fatalf("Error fetching posts: %v", err)
+	if err := auth.Authenticate(); err != nil {
+		log.Fatalf("Authentication failed: %v", err)
 	}
-	reddit.Print(posts)
 
-	// Display the first post
-	firstPost := posts[0]
-	fmt.Println("Title:", firstPost.Title)
-	fmt.Println("URL:", firstPost.URL)
-	fmt.Println("\nFetching comments...\n")
+	client := reddit.NewClient(auth, reddit.WithUserAgent("MyBot/0.0.1"))
 
-	// Example: Fetch posts created in the last 24 hours
-	oneDayAgo := time.Now().Unix() - 86400 // 24 hours ago
-	recentPosts, err := reddit.GetSubreddit(client, "golang", "hot", 50, reddit.Since(oneDayAgo))
+	subreddit := reddit.Subreddit{Name: "brighton"}
+	posts, err := subreddit.GetPosts(client, "new", 10)
 	if err != nil {
-		log.Fatalf("Error fetching recent posts: %v", err)
+		log.Fatal(err)
 	}
-	reddit.Print(recentPosts)
+
+	fmt.Println("Posts from r/golang:")
+	for i, post := range posts {
+		fmt.Printf("\nPost %d:\n%v\n", i+1, post)
+
+		comments, err := post.GetComments(client)
+		if err != nil {
+			log.Printf("Error getting comments: %v\n", err)
+			continue
+		}
+
+		fmt.Println("\nComments:")
+		for j, comment := range comments {
+			fmt.Printf("\nComment %d:\n%v\n", j+1, comment)
+		}
+		fmt.Println("----------------------------------------")
+	}
 }
