@@ -36,3 +36,7 @@ go.work.sum
 # Logs and debugging
 *.log
 debug/
+
+# Example output files
+results.json
+examples/**/results.json
