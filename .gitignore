@@ -1,0 +1,38 @@
+# Binaries and executables
+*.exe
+*.out
+*.app
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Environment and config files
+.env
+*.local
+
+# Go build artifacts
+/bin/
+/pkg/
+/build/
+*.test
+*.exe
+*.so
+*.dll
+*.dylib
+
+# Go modules and dependencies
+go.sum
+go.work
+go.work.sum
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*.bak
+
+# Logs and debugging
+*.log
+debug/
