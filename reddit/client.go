@@ -98,7 +98,11 @@ func (c *Client) GetPosts(subreddit string, params map[string]string) ([]Post, s
 }
 
 // NewClient creates a new Reddit client
-func NewClient(auth *Auth, opts ...ClientOption) *Client {
+func NewClient(auth *Auth, opts ...ClientOption) (*Client, error) {
+	if auth == nil {
+		return nil, fmt.Errorf("auth is required")
+	}
+	
 	c := &Client{
 		Auth:   auth,
 		client: &http.Client{},
@@ -106,5 +110,5 @@ func NewClient(auth *Auth, opts ...ClientOption) *Client {
 	for _, opt := range opts {
 		opt(c)
 	}
-	return c
+	return c, nil
 }

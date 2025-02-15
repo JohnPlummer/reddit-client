@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -36,11 +37,14 @@ func (a *Auth) IsTokenExpired() bool {
 
 // Authenticate with app-only authentication (client credentials flow)
 func (a *Auth) Authenticate() error {
+	slog.Info("authenticating with Reddit")
+
 	data := url.Values{}
 	data.Set("grant_type", "client_credentials")
 
 	req, err := http.NewRequest("POST", tokenURL, strings.NewReader(data.Encode()))
 	if err != nil {
+		slog.Error("failed to create auth request", "error", err)
 		return fmt.Errorf("creating auth request: %w", err)
 	}
 
@@ -76,13 +80,41 @@ func (a *Auth) Authenticate() error {
 	a.Token = tokenResp.AccessToken
 	a.ExpiresAt = time.Now().Add(time.Duration(tokenResp.ExpiresIn) * time.Second)
 
+	slog.Debug("authentication successful",
+		"expires_in", tokenResp.ExpiresIn,
+		"expires_at", a.ExpiresAt,
+	)
+
 	return nil
 }
 
 // EnsureValidToken checks if the token is expired and refreshes if necessary
 func (a *Auth) EnsureValidToken() error {
 	if a.IsTokenExpired() {
+		slog.Debug("token expired, refreshing")
 		return a.Authenticate()
 	}
 	return nil
+}
+
+// Add this function
+func NewAuth(clientID, clientSecret string) *Auth {
+	if clientID == "" {
+		slog.Error("client ID is required")
+		return nil
+	}
+	if clientSecret == "" {
+		slog.Error("client secret is required")
+		return nil
+	}
+
+	slog.Debug("creating new auth client",
+		"client_id", clientID,
+		"client_secret", clientSecret[:4]+"...", // Only show first 4 chars of secret
+	)
+
+	return &Auth{
+		ClientID:     clientID,
+		ClientSecret: clientSecret,
+	}
 }
