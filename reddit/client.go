@@ -1,23 +1,36 @@
 package reddit
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log/slog"
 	"net/http"
+	"strconv"
+	"time"
 )
 
+// Client represents a Reddit API client
 type Client struct {
-	Auth      *Auth
-	userAgent string
-	client    *http.Client
+	Auth        *Auth
+	userAgent   string
+	client      *http.Client
+	rateLimiter *RateLimiter
 }
 
-func (c *Client) request(endpoint string) (*http.Response, error) {
-	if err := c.Auth.EnsureValidToken(); err != nil {
+// request performs an HTTP request with rate limiting and error handling
+func (c *Client) request(ctx context.Context, method, endpoint string) (*http.Response, error) {
+	if err := c.Auth.EnsureValidToken(ctx); err != nil {
 		return nil, fmt.Errorf("ensuring valid token: %w", err)
 	}
 
-	req, err := http.NewRequest("GET", "https://oauth.reddit.com"+endpoint, nil)
+	// Wait for rate limit
+	if err := c.rateLimiter.Wait(ctx); err != nil {
+		return nil, fmt.Errorf("rate limit wait: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, "https://oauth.reddit.com"+endpoint, nil)
 	if err != nil {
 		return nil, fmt.Errorf("creating request: %w", err)
 	}
@@ -30,16 +43,27 @@ func (c *Client) request(endpoint string) (*http.Response, error) {
 		return nil, fmt.Errorf("making request: %w", err)
 	}
 
+	// Update rate limit based on response headers
+	if remaining := resp.Header.Get("X-Ratelimit-Remaining"); remaining != "" {
+		if rem, err := strconv.Atoi(remaining); err == nil {
+			resetStr := resp.Header.Get("X-Ratelimit-Reset")
+			resetInt, _ := strconv.ParseInt(resetStr, 10, 64)
+			reset := time.Unix(resetInt, 0)
+			c.rateLimiter.UpdateLimit(rem, reset)
+		}
+	}
+
 	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
 		resp.Body.Close()
-		return nil, fmt.Errorf("request failed with status %d", resp.StatusCode)
+		return nil, NewAPIError(resp, body)
 	}
 
 	return resp, nil
 }
 
 // GetComments fetches comments for a given post
-func (c *Client) GetComments(subreddit, postID string, params map[string]string) ([]interface{}, error) {
+func (c *Client) GetComments(ctx context.Context, subreddit, postID string, params map[string]string) ([]interface{}, error) {
 	endpoint := fmt.Sprintf("/r/%s/comments/%s", subreddit, postID)
 	if len(params) > 0 {
 		endpoint += "?"
@@ -49,7 +73,7 @@ func (c *Client) GetComments(subreddit, postID string, params map[string]string)
 		endpoint = endpoint[:len(endpoint)-1] // Remove trailing &
 	}
 
-	resp, err := c.request(endpoint)
+	resp, err := c.request(ctx, "GET", endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -57,23 +81,14 @@ func (c *Client) GetComments(subreddit, postID string, params map[string]string)
 
 	var data []interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("decoding response: %w", err)
 	}
 
 	return data, nil
 }
 
-// Add configuration options
-type ClientOption func(*Client)
-
-func WithUserAgent(userAgent string) ClientOption {
-	return func(c *Client) {
-		c.userAgent = userAgent
-	}
-}
-
 // GetPosts fetches a single page of posts from a subreddit
-func (c *Client) GetPosts(subreddit string, params map[string]string) ([]Post, string, error) {
+func (c *Client) GetPosts(ctx context.Context, subreddit string, params map[string]string) ([]Post, string, error) {
 	endpoint := fmt.Sprintf("/r/%s.json", subreddit)
 	if len(params) > 0 {
 		endpoint += "?"
@@ -83,7 +98,7 @@ func (c *Client) GetPosts(subreddit string, params map[string]string) ([]Post, s
 		endpoint = endpoint[:len(endpoint)-1] // Remove trailing &
 	}
 
-	resp, err := c.request(endpoint)
+	resp, err := c.request(ctx, "GET", endpoint)
 	if err != nil {
 		return nil, "", err
 	}
@@ -91,24 +106,45 @@ func (c *Client) GetPosts(subreddit string, params map[string]string) ([]Post, s
 
 	var data map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-		return nil, "", err
+		return nil, "", fmt.Errorf("decoding response: %w", err)
 	}
 
 	return parsePosts(data)
 }
 
 // NewClient creates a new Reddit client
-func NewClient(auth *Auth, opts ...ClientOption) (*Client, error) {
+func NewClient(auth *Auth, opts ...Option) (*Client, error) {
 	if auth == nil {
-		return nil, fmt.Errorf("auth is required")
+		return nil, ErrMissingCredentials
 	}
-	
+
 	c := &Client{
-		Auth:   auth,
-		client: &http.Client{},
+		Auth:        auth,
+		client:      &http.Client{},
+		rateLimiter: NewRateLimiter(60, 5), // Default to 60 requests per minute with burst of 5
 	}
+
+	// Apply options
 	for _, opt := range opts {
-		opt(c)
+		switch o := opt.(type) {
+		case UserAgentOption:
+			c.userAgent = o.UserAgent
+		case RateLimitOption:
+			c.rateLimiter = NewRateLimiter(o.RequestsPerMinute, o.BurstSize)
+		case TimeoutOption:
+			c.client.Timeout = o.Timeout
+		}
 	}
+
+	if c.userAgent == "" {
+		c.userAgent = "golang:reddit-client:v1.0"
+	}
+
+	slog.Debug("creating new client",
+		"user_agent", c.userAgent,
+		"rate_limit", c.rateLimiter.limiter.Limit(),
+		"burst", c.rateLimiter.limiter.Burst(),
+	)
+
 	return c, nil
 }

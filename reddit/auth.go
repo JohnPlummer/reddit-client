@@ -1,6 +1,7 @@
 package reddit
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -23,11 +24,15 @@ type TokenResponse struct {
 	ExpiresIn   int    `json:"expires_in"`
 }
 
+// Auth represents the authentication configuration
 type Auth struct {
 	ClientID     string
 	ClientSecret string
 	Token        string
 	ExpiresAt    time.Time
+	userAgent    string
+	client       *http.Client
+	timeout      time.Duration
 }
 
 // IsTokenExpired checks if the current token is expired or about to expire
@@ -36,24 +41,23 @@ func (a *Auth) IsTokenExpired() bool {
 }
 
 // Authenticate with app-only authentication (client credentials flow)
-func (a *Auth) Authenticate() error {
-	slog.Info("authenticating with Reddit")
+func (a *Auth) Authenticate(ctx context.Context) error {
+	slog.InfoContext(ctx, "authenticating with Reddit")
 
 	data := url.Values{}
 	data.Set("grant_type", "client_credentials")
 
-	req, err := http.NewRequest("POST", tokenURL, strings.NewReader(data.Encode()))
+	req, err := http.NewRequestWithContext(ctx, "POST", tokenURL, strings.NewReader(data.Encode()))
 	if err != nil {
-		slog.Error("failed to create auth request", "error", err)
+		slog.ErrorContext(ctx, "failed to create auth request", "error", err)
 		return fmt.Errorf("creating auth request: %w", err)
 	}
 
 	req.SetBasicAuth(a.ClientID, a.ClientSecret)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("User-Agent", "golang:reddit-client:v1.0 (by /u/yourusername)")
+	req.Header.Set("User-Agent", a.userAgent)
 
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := a.client.Do(req)
 	if err != nil {
 		return fmt.Errorf("making auth request: %w", err)
 	}
@@ -65,7 +69,7 @@ func (a *Auth) Authenticate() error {
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("authentication failed with status %d: %s", resp.StatusCode, string(body))
+		return NewAPIError(resp, body)
 	}
 
 	var tokenResp TokenResponse
@@ -80,7 +84,7 @@ func (a *Auth) Authenticate() error {
 	a.Token = tokenResp.AccessToken
 	a.ExpiresAt = time.Now().Add(time.Duration(tokenResp.ExpiresIn) * time.Second)
 
-	slog.Debug("authentication successful",
+	slog.DebugContext(ctx, "authentication successful",
 		"expires_in", tokenResp.ExpiresIn,
 		"expires_at", a.ExpiresAt,
 	)
@@ -89,32 +93,50 @@ func (a *Auth) Authenticate() error {
 }
 
 // EnsureValidToken checks if the token is expired and refreshes if necessary
-func (a *Auth) EnsureValidToken() error {
+func (a *Auth) EnsureValidToken(ctx context.Context) error {
 	if a.IsTokenExpired() {
-		slog.Debug("token expired, refreshing")
-		return a.Authenticate()
+		slog.DebugContext(ctx, "token expired, refreshing")
+		return a.Authenticate(ctx)
 	}
 	return nil
 }
 
-// Add this function
-func NewAuth(clientID, clientSecret string) *Auth {
+// NewAuth creates a new Auth instance with the provided credentials
+func NewAuth(clientID, clientSecret string, opts ...Option) (*Auth, error) {
 	if clientID == "" {
-		slog.Error("client ID is required")
-		return nil
+		return nil, ErrMissingCredentials
 	}
 	if clientSecret == "" {
-		slog.Error("client secret is required")
-		return nil
+		return nil, ErrMissingCredentials
+	}
+
+	auth := &Auth{
+		ClientID:     clientID,
+		ClientSecret: clientSecret,
+		timeout:      10 * time.Second,
+		userAgent:    "golang:reddit-client:v1.0",
+	}
+
+	// Apply options
+	for _, opt := range opts {
+		switch o := opt.(type) {
+		case UserAgentOption:
+			auth.userAgent = o.UserAgent
+		case TimeoutOption:
+			auth.timeout = o.Timeout
+		}
+	}
+
+	auth.client = &http.Client{
+		Timeout: auth.timeout,
 	}
 
 	slog.Debug("creating new auth client",
 		"client_id", clientID,
 		"client_secret", clientSecret[:4]+"...", // Only show first 4 chars of secret
+		"user_agent", auth.userAgent,
+		"timeout", auth.timeout,
 	)
 
-	return &Auth{
-		ClientID:     clientID,
-		ClientSecret: clientSecret,
-	}
+	return auth, nil
 }
