@@ -4,13 +4,15 @@ import "fmt"
 
 // Post represents a Reddit post with relevant fields.
 type Post struct {
-	Title     string `json:"title"`
-	SelfText  string `json:"selftext"`
-	URL       string `json:"url"`
-	Created   int64  `json:"created_utc"`
-	Subreddit string `json:"subreddit"`
-	ID        string `json:"id"`
-	Score     int    `json:"score"`
+	Title        string `json:"title"`
+	SelfText     string `json:"selftext"`
+	URL          string `json:"url"`
+	Created      int64  `json:"created_utc"`
+	Subreddit    string `json:"subreddit"`
+	ID           string `json:"id"`
+	RedditScore  int    `json:"score"` // Reddit's upvotes minus downvotes
+	ContentScore int    `json:"-"`     // Our custom content-based score
+	CommentCount int    `json:"num_comments"`
 }
 
 // String returns a formatted string representation of the Post
@@ -23,7 +25,9 @@ func (p Post) String() string {
 			"    Created: %d\n"+
 			"    Subreddit: %q\n"+
 			"    ID: %q\n"+
-			"    Score: %d\n"+
+			"    RedditScore: %d\n"+
+			"    ContentScore: %d\n"+
+			"    CommentCount: %d\n"+
 			"}",
 		p.Title,
 		p.SelfText,
@@ -31,10 +35,11 @@ func (p Post) String() string {
 		p.Created,
 		p.Subreddit,
 		p.ID,
-		p.Score,
+		p.RedditScore,
+		p.ContentScore,
+		p.CommentCount,
 	)
 }
-
 
 // parsePost extracts a single post from the API response.
 func parsePost(item interface{}) (Post, error) {
@@ -56,15 +61,18 @@ func parsePost(item interface{}) (Post, error) {
 	subreddit, _ := data["subreddit"].(string)
 	id, _ := data["id"].(string)
 	score, _ := data["score"].(float64)
+	commentCount, _ := data["num_comments"].(float64)
 
 	return Post{
-		Title:     title,
-		SelfText:  selfText,
-		URL:       url,
-		Created:   int64(created),
-		Subreddit: subreddit,
-		ID:        id,
-		Score:     int(score),
+		Title:        title,
+		SelfText:     selfText,
+		URL:          url,
+		Created:      int64(created),
+		Subreddit:    subreddit,
+		ID:           id,
+		RedditScore:  int(score),
+		ContentScore: 0, // Initialize to 0, will be set by content analysis
+		CommentCount: int(commentCount),
 	}, nil
 }
 
