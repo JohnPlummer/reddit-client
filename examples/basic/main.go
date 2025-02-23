@@ -50,10 +50,7 @@ func main() {
 	fmt.Println("Latest posts from r/golang:")
 	fmt.Println("---------------------------")
 	for _, post := range posts {
-		fmt.Printf("\nTitle: %s\n", post.Title)
-		fmt.Printf("Created: %d\n", post.Created)
-		fmt.Printf("Score: %d\n", post.Score)
-		fmt.Printf("URL: %s\n", post.URL)
+		fmt.Println(post.String())
 		fmt.Println("---------------------------")
 	}
 }
