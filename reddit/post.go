@@ -4,15 +4,16 @@ import "fmt"
 
 // Post represents a Reddit post with relevant fields.
 type Post struct {
-	Title        string `json:"title"`
-	SelfText     string `json:"selftext"`
-	URL          string `json:"url"`
-	Created      int64  `json:"created_utc"`
-	Subreddit    string `json:"subreddit"`
-	ID           string `json:"id"`
-	RedditScore  int    `json:"score"` // Reddit's upvotes minus downvotes
-	ContentScore int    `json:"-"`     // Our custom content-based score
-	CommentCount int    `json:"num_comments"`
+	Title        string    `json:"title"`
+	SelfText     string    `json:"selftext"`
+	URL          string    `json:"url"`
+	Created      int64     `json:"created_utc"`
+	Subreddit    string    `json:"subreddit"`
+	ID           string    `json:"id"`
+	RedditScore  int       `json:"score"` // Reddit's upvotes minus downvotes
+	ContentScore int       `json:"-"`     // Our custom content-based score
+	CommentCount int       `json:"num_comments"`
+	Comments     []Comment `json:"comments,omitempty"`
 }
 
 // String returns a formatted string representation of the Post
@@ -28,6 +29,7 @@ func (p Post) String() string {
 			"    RedditScore: %d\n"+
 			"    ContentScore: %d\n"+
 			"    CommentCount: %d\n"+
+			"    Comments: %d\n"+
 			"}",
 		p.Title,
 		p.SelfText,
@@ -38,6 +40,7 @@ func (p Post) String() string {
 		p.RedditScore,
 		p.ContentScore,
 		p.CommentCount,
+		len(p.Comments),
 	)
 }
 
