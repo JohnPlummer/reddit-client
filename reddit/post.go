@@ -1,6 +1,9 @@
 package reddit
 
-import "fmt"
+import (
+	"context"
+	"fmt"
+)
 
 // Post represents a Reddit post with relevant fields.
 type Post struct {
@@ -110,17 +113,17 @@ type CommentOption func(params map[string]string)
 
 // CommentGetter interface for fetching comments
 type CommentGetter interface {
-	GetComments(subreddit, postID string, params map[string]string) ([]interface{}, error)
+	GetComments(ctx context.Context, subreddit, postID string, params map[string]string) ([]interface{}, error)
 }
 
 // GetComments fetches comments for this post with optional filters
-func (p Post) GetComments(c CommentGetter, opts ...CommentOption) ([]Comment, error) {
+func (p Post) GetComments(ctx context.Context, c CommentGetter, opts ...CommentOption) ([]Comment, error) {
 	params := make(map[string]string)
 	for _, opt := range opts {
 		opt(params)
 	}
 
-	data, err := c.GetComments(p.Subreddit, p.ID, params)
+	data, err := c.GetComments(ctx, p.Subreddit, p.ID, params)
 	if err != nil {
 		return nil, fmt.Errorf("fetching comments: %w", err)
 	}

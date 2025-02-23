@@ -1,6 +1,7 @@
 package reddit
 
 import (
+	"context"
 	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -13,7 +14,7 @@ type mockCommentGetter struct {
 	err      error
 }
 
-func (m *mockCommentGetter) GetComments(subreddit, postID string, params map[string]string) ([]interface{}, error) {
+func (m *mockCommentGetter) GetComments(ctx context.Context, subreddit, postID string, params map[string]string) ([]interface{}, error) {
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -44,7 +45,7 @@ var _ = Describe("Post", func() {
 			client := &mockCommentGetter{comments: mockComments}
 			post := Post{ID: "123", Subreddit: "golang"}
 
-			comments, err := post.GetComments(client)
+			comments, err := post.GetComments(context.Background(), client)
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(comments).To(HaveLen(1))
@@ -74,7 +75,7 @@ var _ = Describe("Post", func() {
 			client := &mockCommentGetter{comments: mockComments}
 			post := Post{ID: "123", Subreddit: "golang"}
 
-			comments, err := post.GetComments(client, CommentsSince(500))
+			comments, err := post.GetComments(context.Background(), client, CommentsSince(500))
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(comments).To(HaveLen(1))
@@ -84,7 +85,7 @@ var _ = Describe("Post", func() {
 			client := &mockCommentGetter{err: fmt.Errorf("API error")}
 			post := Post{ID: "123", Subreddit: "golang"}
 
-			_, err := post.GetComments(client)
+			_, err := post.GetComments(context.Background(), client)
 
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("API error"))
