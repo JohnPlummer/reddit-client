@@ -8,13 +8,13 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-// mockCommentGetter implements CommentGetter for testing
+// mockCommentGetter implements commentGetter for testing
 type mockCommentGetter struct {
 	comments []interface{}
 	err      error
 }
 
-func (m *mockCommentGetter) GetComments(ctx context.Context, subreddit, postID string, params map[string]string) ([]interface{}, error) {
+func (m *mockCommentGetter) getComments(ctx context.Context, subreddit, postID string, params map[string]string) ([]interface{}, error) {
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -43,9 +43,9 @@ var _ = Describe("Post", func() {
 			}
 
 			client := &mockCommentGetter{comments: mockComments}
-			post := Post{ID: "123", Subreddit: "golang"}
+			post := Post{ID: "123", Subreddit: "golang", client: client}
 
-			comments, err := post.GetComments(context.Background(), client)
+			comments, err := post.GetComments(context.Background())
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(comments).To(HaveLen(1))
@@ -73,9 +73,9 @@ var _ = Describe("Post", func() {
 			}
 
 			client := &mockCommentGetter{comments: mockComments}
-			post := Post{ID: "123", Subreddit: "golang"}
+			post := Post{ID: "123", Subreddit: "golang", client: client}
 
-			comments, err := post.GetComments(context.Background(), client, CommentsSince(500))
+			comments, err := post.GetComments(context.Background(), CommentsSince(500))
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(comments).To(HaveLen(1))
@@ -83,9 +83,9 @@ var _ = Describe("Post", func() {
 
 		It("handles errors", func() {
 			client := &mockCommentGetter{err: fmt.Errorf("API error")}
-			post := Post{ID: "123", Subreddit: "golang"}
+			post := Post{ID: "123", Subreddit: "golang", client: client}
 
-			_, err := post.GetComments(context.Background(), client)
+			_, err := post.GetComments(context.Background())
 
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("API error"))

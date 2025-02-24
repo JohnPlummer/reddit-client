@@ -143,7 +143,7 @@ var _ = Describe("Client", func() {
 		})
 	})
 
-	Describe("GetComments", func() {
+	Describe("getComments", func() {
 		Context("with rate limiting", func() {
 			It("handles rate limit errors", func() {
 				// Setup responses for two requests
@@ -166,11 +166,11 @@ var _ = Describe("Client", func() {
 
 				// First request should succeed
 				ctx := context.Background()
-				_, err := client.GetComments(ctx, "test", "123", nil)
+				_, err := client.getComments(ctx, "test", "123", nil)
 				Expect(err).NotTo(HaveOccurred())
 
 				// Second request should be rate limited
-				_, err = client.GetComments(ctx, "test", "123", nil)
+				_, err = client.getComments(ctx, "test", "123", nil)
 				Expect(IsRateLimitError(err)).To(BeTrue())
 			})
 		})

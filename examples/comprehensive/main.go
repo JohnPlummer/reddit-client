@@ -17,6 +17,8 @@ import (
 	"github.com/joho/godotenv"
 )
 
+const fetchIntervalDelay = time.Second
+
 // Configuration holds the application configuration
 type Config struct {
 	subreddit   string
@@ -115,13 +117,13 @@ func main() {
 	pageCount := 0
 	totalPosts := 0
 
+FetchLoop:
 	for pageCount < cfg.maxPages {
 		select {
 		case <-ctx.Done():
 			result.Error = "operation cancelled"
-			saveResult(cfg, result)
-			return
-		default:
+			break FetchLoop
+		case <-time.After(fetchIntervalDelay):
 		}
 
 		// Show progress
@@ -151,10 +153,7 @@ func main() {
 			fmt.Println(post.String())
 
 			// Get comments for this post
-			comments, err := client.GetComments(ctx, cfg.subreddit, post.ID, map[string]string{
-				"sort":  "top",
-				"limit": "2", // Limit to top 2 comments for example
-			})
+			comments, err := post.GetComments(ctx)
 			if err != nil {
 				slog.Error("Error getting comments for post",
 					"post_id", post.ID,
@@ -182,14 +181,6 @@ func main() {
 
 		after = nextAfter
 		pageCount++
-
-		// Small delay between pages to be nice to the API
-		select {
-		case <-ctx.Done():
-			result.Error = "operation cancelled"
-			break
-		case <-time.After(time.Second):
-		}
 	}
 
 	fmt.Println() // Clear progress line

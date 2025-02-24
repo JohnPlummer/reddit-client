@@ -62,8 +62,8 @@ func (c *Client) request(ctx context.Context, method, endpoint string) (*http.Re
 	return resp, nil
 }
 
-// GetComments fetches comments for a given post
-func (c *Client) GetComments(ctx context.Context, subreddit, postID string, params map[string]string) ([]interface{}, error) {
+// getComments is an internal method for fetching comments
+func (c *Client) getComments(ctx context.Context, subreddit, postID string, params map[string]string) ([]interface{}, error) {
 	endpoint := fmt.Sprintf("/r/%s/comments/%s", subreddit, postID)
 	if len(params) > 0 {
 		endpoint += "?"
@@ -109,7 +109,7 @@ func (c *Client) GetPosts(ctx context.Context, subreddit string, params map[stri
 		return nil, "", fmt.Errorf("decoding response: %w", err)
 	}
 
-	return parsePosts(data)
+	return parsePosts(data, c)
 }
 
 // NewClient creates a new Reddit client

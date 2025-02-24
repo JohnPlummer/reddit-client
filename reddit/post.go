@@ -7,16 +7,22 @@ import (
 
 // Post represents a Reddit post with relevant fields.
 type Post struct {
-	Title        string    `json:"title"`
-	SelfText     string    `json:"selftext"`
-	URL          string    `json:"url"`
-	Created      int64     `json:"created_utc"`
-	Subreddit    string    `json:"subreddit"`
-	ID           string    `json:"id"`
-	RedditScore  int       `json:"score"` // Reddit's upvotes minus downvotes
-	ContentScore int       `json:"-"`     // Our custom content-based score
-	CommentCount int       `json:"num_comments"`
-	Comments     []Comment `json:"comments,omitempty"`
+	Title        string        `json:"title"`
+	SelfText     string        `json:"selftext"`
+	URL          string        `json:"url"`
+	Created      int64         `json:"created_utc"`
+	Subreddit    string        `json:"subreddit"`
+	ID           string        `json:"id"`
+	RedditScore  int           `json:"score"` // Reddit's upvotes minus downvotes
+	ContentScore int           `json:"-"`     // Our custom content-based score
+	CommentCount int           `json:"num_comments"`
+	Comments     []Comment     `json:"comments,omitempty"`
+	client       commentGetter // interface for fetching comments (should hold a pointer to the client)
+}
+
+// commentGetter interface for fetching comments (private but useful for testing)
+type commentGetter interface {
+	getComments(ctx context.Context, subreddit, postID string, params map[string]string) ([]interface{}, error)
 }
 
 // String returns a formatted string representation of the Post
@@ -48,7 +54,7 @@ func (p Post) String() string {
 }
 
 // parsePost extracts a single post from the API response.
-func parsePost(item interface{}) (Post, error) {
+func parsePost(item interface{}, client commentGetter) (Post, error) {
 	postMap, ok := item.(map[string]interface{})
 	if !ok {
 		return Post{}, fmt.Errorf("invalid post format")
@@ -79,11 +85,12 @@ func parsePost(item interface{}) (Post, error) {
 		RedditScore:  int(score),
 		ContentScore: 0, // Initialize to 0, will be set by content analysis
 		CommentCount: int(commentCount),
+		client:       client,
 	}, nil
 }
 
 // parsePosts extracts posts and the pagination cursor from API response.
-func parsePosts(data map[string]interface{}) ([]Post, string, error) {
+func parsePosts(data map[string]interface{}, client commentGetter) ([]Post, string, error) {
 	var posts []Post
 
 	listing, ok := data["data"].(map[string]interface{})
@@ -97,7 +104,7 @@ func parsePosts(data map[string]interface{}) ([]Post, string, error) {
 	}
 
 	for _, item := range children {
-		post, err := parsePost(item)
+		post, err := parsePost(item, client)
 		if err != nil {
 			continue // Skip invalid posts instead of failing completely
 		}
@@ -117,13 +124,17 @@ type CommentGetter interface {
 }
 
 // GetComments fetches comments for this post with optional filters
-func (p Post) GetComments(ctx context.Context, c CommentGetter, opts ...CommentOption) ([]Comment, error) {
+func (p *Post) GetComments(ctx context.Context, opts ...CommentOption) ([]Comment, error) {
+	if p.client == nil {
+		return nil, fmt.Errorf("post has no associated client")
+	}
+
 	params := make(map[string]string)
 	for _, opt := range opts {
 		opt(params)
 	}
 
-	data, err := c.GetComments(ctx, p.Subreddit, p.ID, params)
+	data, err := p.client.getComments(ctx, p.Subreddit, p.ID, params)
 	if err != nil {
 		return nil, fmt.Errorf("fetching comments: %w", err)
 	}
