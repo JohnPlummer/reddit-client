@@ -190,6 +190,9 @@ FetchLoop:
 		"subreddit", cfg.subreddit,
 	)
 
+	// Cancel context to signal completion to goroutines
+	cancel()
+
 	// Save results if output file is specified
 	if err := saveResult(cfg, result); err != nil {
 		slog.Error("failed to save results", "error", err)
