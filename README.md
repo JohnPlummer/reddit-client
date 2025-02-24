@@ -69,8 +69,11 @@ func main() {
     }
 
     // Print posts
+    fmt.Println("Latest posts from r/golang:")
+    fmt.Println("---------------------------")
     for _, post := range posts {
-        fmt.Printf("Title: %s\nScore: %d\nURL: %s\n\n", post.Title, post.Score, post.URL)
+        fmt.Println(post)
+        fmt.Println("---------------------------")
     }
 }
 ```
