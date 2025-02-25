@@ -19,6 +19,11 @@ type Client struct {
 	rateLimiter *RateLimiter
 }
 
+// SetHTTPClient sets the HTTP client (used for testing)
+func (c *Client) SetHTTPClient(client *http.Client) {
+	c.client = client
+}
+
 // request performs an HTTP request with rate limiting and error handling
 func (c *Client) request(ctx context.Context, method, endpoint string) (*http.Response, error) {
 	if err := c.Auth.EnsureValidToken(ctx); err != nil {

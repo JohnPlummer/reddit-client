@@ -3,6 +3,7 @@ module github.com/JohnPlummer/reddit-client
 go 1.23.1
 
 require (
+	github.com/golang/mock v1.6.0
 	github.com/onsi/ginkgo/v2 v2.22.2
 	github.com/onsi/gomega v1.36.2
 	golang.org/x/time v0.5.0

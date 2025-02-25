@@ -1,62 +1,78 @@
-package reddit
+package reddit_test
 
 import (
 	"context"
-	"fmt"
+	"io"
+	"net/http"
+	"strings"
+	"time"
 
+	"github.com/JohnPlummer/reddit-client/reddit"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
-// mockCommentGetter implements commentGetter for testing
-type mockCommentGetter struct {
-	comments []interface{}
-	err      error
-}
-
-func (m *mockCommentGetter) getComments(ctx context.Context, subreddit, postID string, params map[string]string) ([]interface{}, error) {
-	if m.err != nil {
-		return nil, m.err
-	}
-	return m.comments, nil
-}
-
 var _ = Describe("Post", func() {
 	Describe("Fullname", func() {
 		It("returns the correct Reddit fullname format", func() {
-			post := Post{ID: "abc123"}
+			post := reddit.Post{ID: "abc123"}
 			Expect(post.Fullname()).To(Equal("t3_abc123"))
 		})
 
 		It("handles empty ID", func() {
-			post := Post{}
+			post := reddit.Post{}
 			Expect(post.Fullname()).To(Equal("t3_"))
 		})
 	})
 
 	Describe("GetComments", func() {
-		It("fetches comments for a post", func() {
-			mockComments := []interface{}{
-				map[string]interface{}{}, // Post data
-				map[string]interface{}{ // Comments data
-					"data": map[string]interface{}{
-						"children": []interface{}{
-							map[string]interface{}{
-								"data": map[string]interface{}{
-									"author":      "user1",
-									"body":        "comment1",
-									"created_utc": float64(1234567890),
-									"id":          "c1",
-								},
-							},
-						},
-					},
-				},
+		var (
+			auth      *reddit.Auth
+			client    *reddit.Client
+			transport *MockTransport
+		)
+
+		BeforeEach(func() {
+			auth = &reddit.Auth{
+				Token:     "test_token",
+				ExpiresAt: time.Now().Add(time.Hour),
 			}
 
-			client := &mockCommentGetter{comments: mockComments}
-			post := Post{ID: "123", Subreddit: "golang", client: client}
+			// Setup mock transport with default success response for posts
+			postsResp := &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`{"data": {"children": [{"data": {"id": "123", "title": "Test Post", "subreddit": "golang"}}]}}`)),
+			}
 
+			transport = &MockTransport{
+				Responses: []*http.Response{postsResp},
+				Errors:    []error{nil},
+			}
+
+			var err error
+			client, err = reddit.NewClient(auth)
+			Expect(err).NotTo(HaveOccurred())
+			client.SetHTTPClient(&http.Client{Transport: transport})
+		})
+
+		It("fetches comments for a post", func() {
+			// Setup mock response for comments
+			commentsResp := &http.Response{
+				StatusCode: http.StatusOK,
+				Body: io.NopCloser(strings.NewReader(`[
+					{},
+					{"data": {"children": [{"data": {"author": "user1", "body": "comment1", "created_utc": 1234567890, "id": "c1"}}]}}
+				]`)),
+			}
+			transport.Responses = append(transport.Responses, commentsResp)
+			transport.Errors = append(transport.Errors, nil)
+
+			// Create a post through the public interface
+			posts, _, err := client.GetPosts(context.Background(), "golang", nil)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(posts).To(HaveLen(1))
+
+			post := posts[0]
 			comments, err := post.GetComments(context.Background())
 
 			Expect(err).NotTo(HaveOccurred())
@@ -66,41 +82,48 @@ var _ = Describe("Post", func() {
 		})
 
 		It("handles comment filtering by timestamp", func() {
-			mockComments := []interface{}{
-				map[string]interface{}{},
-				map[string]interface{}{
-					"data": map[string]interface{}{
-						"children": []interface{}{
-							map[string]interface{}{
-								"data": map[string]interface{}{
-									"author":      "user1",
-									"body":        "comment1",
-									"created_utc": float64(1000),
-									"id":          "c1",
-								},
-							},
-						},
-					},
-				},
+			// Setup mock response for comments
+			commentsResp := &http.Response{
+				StatusCode: http.StatusOK,
+				Body: io.NopCloser(strings.NewReader(`[
+					{},
+					{"data": {"children": [{"data": {"author": "user1", "body": "comment1", "created_utc": 1000, "id": "c1"}}]}}
+				]`)),
 			}
+			transport.Responses = append(transport.Responses, commentsResp)
+			transport.Errors = append(transport.Errors, nil)
 
-			client := &mockCommentGetter{comments: mockComments}
-			post := Post{ID: "123", Subreddit: "golang", client: client}
+			// Create a post through the public interface
+			posts, _, err := client.GetPosts(context.Background(), "golang", nil)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(posts).To(HaveLen(1))
 
-			comments, err := post.GetComments(context.Background(), CommentsSince(500))
+			post := posts[0]
+			comments, err := post.GetComments(context.Background(), reddit.CommentsSince(500))
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(comments).To(HaveLen(1))
 		})
 
 		It("handles errors", func() {
-			client := &mockCommentGetter{err: fmt.Errorf("API error")}
-			post := Post{ID: "123", Subreddit: "golang", client: client}
+			// Setup mock response for comments with error
+			commentsResp := &http.Response{
+				StatusCode: http.StatusInternalServerError,
+				Body:       io.NopCloser(strings.NewReader(`{"error": "API error"}`)),
+			}
+			transport.Responses = append(transport.Responses, commentsResp)
+			transport.Errors = append(transport.Errors, nil)
 
-			_, err := post.GetComments(context.Background())
+			// Create a post through the public interface
+			posts, _, err := client.GetPosts(context.Background(), "golang", nil)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(posts).To(HaveLen(1))
+
+			post := posts[0]
+			_, err = post.GetComments(context.Background())
 
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("API error"))
+			Expect(err.Error()).To(ContainSubstring("server error"))
 		})
 	})
 })

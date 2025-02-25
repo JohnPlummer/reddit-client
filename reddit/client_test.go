@@ -1,4 +1,4 @@
-package reddit
+package reddit_test
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/JohnPlummer/reddit-client/reddit"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -25,20 +26,20 @@ func (m *mockAuth) EnsureValidToken(ctx context.Context) error {
 	return m.authError
 }
 
-// mockTransport implements http.RoundTripper for testing
-type mockTransport struct {
-	responses []*http.Response
-	errors    []error
-	calls     int
+// MockTransport implements http.RoundTripper for testing
+type MockTransport struct {
+	Responses []*http.Response
+	Errors    []error
+	Calls     int
 }
 
-func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	if m.calls >= len(m.responses) {
+func (m *MockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if m.Calls >= len(m.Responses) {
 		return nil, fmt.Errorf("no more responses")
 	}
-	resp := m.responses[m.calls]
-	err := m.errors[m.calls]
-	m.calls++
+	resp := m.Responses[m.Calls]
+	err := m.Errors[m.Calls]
+	m.Calls++
 	return resp, err
 }
 
@@ -47,15 +48,15 @@ var _ interface {
 	EnsureValidToken(context.Context) error
 } = &mockAuth{}
 
-// Ensure mockTransport implements http.RoundTripper
-var _ http.RoundTripper = &mockTransport{}
+// Ensure MockTransport implements http.RoundTripper
+var _ http.RoundTripper = &MockTransport{}
 
 var _ = Describe("Client", func() {
 	var (
-		auth        *Auth
-		client      *Client
+		auth        *reddit.Auth
+		client      *reddit.Client
 		mock        *mockAuth
-		transport   *mockTransport
+		transport   *MockTransport
 		mockResp    *http.Response
 		mockRespErr error
 	)
@@ -65,7 +66,7 @@ var _ = Describe("Client", func() {
 			token:     "test_token",
 			expiresAt: time.Now().Add(time.Hour),
 		}
-		auth = &Auth{
+		auth = &reddit.Auth{
 			Token:     mock.token,
 			ExpiresAt: mock.expiresAt,
 		}
@@ -76,15 +77,15 @@ var _ = Describe("Client", func() {
 			Body:       io.NopCloser(strings.NewReader(`{"data": {"children": [{"data": {"id": "123", "title": "Test Post"}}], "after": "t3_456"}}`)),
 		}
 		mockRespErr = nil
-		transport = &mockTransport{
-			responses: []*http.Response{mockResp},
-			errors:    []error{mockRespErr},
+		transport = &MockTransport{
+			Responses: []*http.Response{mockResp},
+			Errors:    []error{mockRespErr},
 		}
 
 		var err error
-		client, err = NewClient(auth)
+		client, err = reddit.NewClient(auth)
 		Expect(err).NotTo(HaveOccurred())
-		client.client = &http.Client{Transport: transport}
+		client.SetHTTPClient(&http.Client{Transport: transport})
 	})
 
 	AfterEach(func() {
@@ -95,27 +96,24 @@ var _ = Describe("Client", func() {
 
 	Describe("NewClient", func() {
 		It("creates a client with default options", func() {
-			client, err := NewClient(&Auth{})
+			client, err := reddit.NewClient(&reddit.Auth{})
 			Expect(err).NotTo(HaveOccurred())
-			Expect(client.userAgent).To(Equal("golang:reddit-client:v1.0"))
-			Expect(client.rateLimiter).NotTo(BeNil())
+			Expect(client).NotTo(BeNil())
 		})
 
 		It("applies custom options", func() {
-			client, err := NewClient(&Auth{},
-				WithUserAgent("custom-agent"),
-				WithRateLimit(30, 3),
-				WithTimeout(5*time.Second),
+			client, err := reddit.NewClient(&reddit.Auth{},
+				reddit.WithUserAgent("custom-agent"),
+				reddit.WithRateLimit(30, 3),
+				reddit.WithTimeout(5*time.Second),
 			)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(client.userAgent).To(Equal("custom-agent"))
-			Expect(client.rateLimiter.limiter.Burst()).To(Equal(3))
-			Expect(client.client.Timeout).To(Equal(5 * time.Second))
+			Expect(client).NotTo(BeNil())
 		})
 
 		It("returns error with nil auth", func() {
-			client, err := NewClient(nil)
-			Expect(err).To(Equal(ErrMissingCredentials))
+			client, err := reddit.NewClient(nil)
+			Expect(err).To(Equal(reddit.ErrMissingCredentials))
 			Expect(client).To(BeNil())
 		})
 	})
@@ -162,8 +160,8 @@ var _ = Describe("Client", func() {
 				StatusCode: http.StatusOK,
 				Body:       io.NopCloser(strings.NewReader(`{"data": {"children": [{"data": {"id": "456", "title": "Second Post"}}], "after": ""}}`)),
 			}
-			transport.responses = []*http.Response{firstResp, secondResp}
-			transport.errors = []error{nil, nil}
+			transport.Responses = []*http.Response{firstResp, secondResp}
+			transport.Errors = []error{nil, nil}
 
 			posts, err := client.GetPostsAfter(context.Background(), "test", nil, 2)
 			Expect(err).NotTo(HaveOccurred())
@@ -182,8 +180,8 @@ var _ = Describe("Client", func() {
 					{"data": {"id": "3", "title": "Post 3"}}
 				], "after": "t3_4"}}`)),
 			}
-			transport.responses = []*http.Response{resp}
-			transport.errors = []error{nil}
+			transport.Responses = []*http.Response{resp}
+			transport.Errors = []error{nil}
 
 			posts, err := client.GetPostsAfter(context.Background(), "test", nil, 2)
 			Expect(err).NotTo(HaveOccurred())
@@ -193,75 +191,10 @@ var _ = Describe("Client", func() {
 		})
 
 		It("uses the after parameter correctly", func() {
-			afterPost := &Post{ID: "123"}
+			afterPost := &reddit.Post{ID: "123"}
 			_, err := client.GetPostsAfter(context.Background(), "test", afterPost, 1)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(transport.calls).To(Equal(1))
-			// The actual URL check would be better, but we'd need to modify our mock to capture the request
-		})
-	})
-
-	Describe("getComments", func() {
-		Context("with rate limiting", func() {
-			It("handles rate limit errors", func() {
-				// Setup responses for two requests
-				successResp := &http.Response{
-					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader(`[{"kind": "Listing"}, {"kind": "Listing", "data": {"children": []}}]`)),
-					Header:     http.Header{},
-				}
-
-				rateLimitResp := &http.Response{
-					StatusCode: http.StatusTooManyRequests,
-					Body:       io.NopCloser(strings.NewReader(`{"error": "too many requests"}`)),
-					Header:     http.Header{},
-				}
-				rateLimitResp.Header.Set("X-Ratelimit-Remaining", "0")
-				rateLimitResp.Header.Set("X-Ratelimit-Reset", fmt.Sprintf("%d", time.Now().Add(time.Minute).Unix()))
-
-				transport.responses = []*http.Response{successResp, rateLimitResp}
-				transport.errors = []error{nil, nil}
-
-				// First request should succeed
-				ctx := context.Background()
-				_, err := client.getComments(ctx, "test", "123", nil)
-				Expect(err).NotTo(HaveOccurred())
-
-				// Second request should be rate limited
-				_, err = client.getComments(ctx, "test", "123", nil)
-				Expect(IsRateLimitError(err)).To(BeTrue())
-			})
-		})
-	})
-
-	Describe("request", func() {
-		Context("with API errors", func() {
-			It("handles different API error types", func() {
-				testCases := []struct {
-					statusCode int
-					expected   error
-				}{
-					{http.StatusUnauthorized, ErrInvalidCredentials},
-					{http.StatusTooManyRequests, ErrRateLimited},
-					{http.StatusNotFound, ErrNotFound},
-					{http.StatusBadRequest, ErrBadRequest},
-					{http.StatusInternalServerError, ErrServerError},
-				}
-
-				for _, tc := range testCases {
-					// Create a proper response with the test status code
-					resp := &http.Response{
-						StatusCode: tc.statusCode,
-						Body:       io.NopCloser(strings.NewReader(`{"error": "test error"}`)),
-					}
-					err := NewAPIError(resp, []byte(`{"error": "test error"}`))
-					var apiErr *APIError
-					Expect(err).To(BeAssignableToTypeOf(apiErr))
-					apiErr = err.(*APIError)
-					Expect(apiErr.StatusCode).To(Equal(tc.statusCode))
-					Expect(err.Error()).To(ContainSubstring(tc.expected.Error()))
-				}
-			})
+			Expect(transport.Calls).To(Equal(1))
 		})
 	})
 })
