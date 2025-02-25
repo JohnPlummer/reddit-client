@@ -112,6 +112,47 @@ func (c *Client) GetPosts(ctx context.Context, subreddit string, params map[stri
 	return parsePosts(data, c)
 }
 
+// GetPostsAfter fetches posts from a subreddit that come after the specified post.
+// This method will automatically fetch multiple pages as needed up to the specified limit.
+// Set limit to 0 to fetch all available posts (use with caution).
+//
+// This is useful for implementing infinite scroll or pagination. The posts are returned
+// in chronological order (newest first).
+func (c *Client) GetPostsAfter(ctx context.Context, subreddit string, after *Post, limit int) ([]Post, error) {
+	params := map[string]string{"limit": "100"}
+	var allPosts []Post
+
+	// If after is provided, use its fullname as the after cursor
+	if after != nil {
+		params["after"] = after.Fullname()
+	}
+
+	for {
+		posts, nextAfter, err := c.GetPosts(ctx, subreddit, params)
+		if err != nil {
+			return nil, err
+		}
+
+		allPosts = append(allPosts, posts...)
+
+		// Stop if we've reached the desired limit
+		if limit > 0 && len(allPosts) >= limit {
+			allPosts = allPosts[:limit]
+			break
+		}
+
+		// Stop if there are no more pages
+		if nextAfter == "" {
+			break
+		}
+
+		// Update the after parameter for the next request
+		params["after"] = nextAfter
+	}
+
+	return allPosts, nil
+}
+
 // NewClient creates a new Reddit client
 func NewClient(auth *Auth, opts ...Option) (*Client, error) {
 	if auth == nil {

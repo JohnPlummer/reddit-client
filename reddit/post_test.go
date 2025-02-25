@@ -22,6 +22,18 @@ func (m *mockCommentGetter) getComments(ctx context.Context, subreddit, postID s
 }
 
 var _ = Describe("Post", func() {
+	Describe("Fullname", func() {
+		It("returns the correct Reddit fullname format", func() {
+			post := Post{ID: "abc123"}
+			Expect(post.Fullname()).To(Equal("t3_abc123"))
+		})
+
+		It("handles empty ID", func() {
+			post := Post{}
+			Expect(post.Fullname()).To(Equal("t3_"))
+		})
+	})
+
 	Describe("GetComments", func() {
 		It("fetches comments for a post", func() {
 			mockComments := []interface{}{

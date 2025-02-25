@@ -60,7 +60,7 @@ func main() {
     }
 
     // Get posts from a subreddit
-    posts, _, err := client.GetPosts(ctx, "golang", map[string]string{
+    posts, after, err := client.GetPosts(ctx, "golang", map[string]string{
         "limit": "10",
         "sort":  "new",
     })
@@ -74,6 +74,20 @@ func main() {
     for _, post := range posts {
         fmt.Println(post)
         fmt.Println("---------------------------")
+    }
+
+    // Get more posts using the after cursor
+    if after != "" {
+        morePosts, err := client.GetPostsAfter(ctx, "golang", &posts[len(posts)-1], 10)
+        if err != nil {
+            log.Fatal("Error getting more posts:", err)
+        }
+        fmt.Println("\nNext page of posts:")
+        fmt.Println("---------------------------")
+        for _, post := range morePosts {
+            fmt.Println(post)
+            fmt.Println("---------------------------")
+        }
     }
 }
 ```
@@ -116,6 +130,50 @@ reddit.WithRateLimit(60, 5)
 
 // Set request timeout
 reddit.WithTimeout(10 * time.Second)
+```
+
+## API Methods
+
+### GetPosts
+
+Fetches a single page of posts from a subreddit. Returns posts and a cursor for pagination.
+
+```go
+posts, after, err := client.GetPosts(ctx, "golang", map[string]string{
+    "limit": "25",  // Number of posts to fetch (max 100)
+    "sort": "new",  // Sort order (new, hot, top, etc.)
+})
+```
+
+### GetPostsAfter
+
+Fetches multiple pages of posts after a specific post. Useful for implementing infinite scroll or pagination.
+
+```go
+// Get posts after a specific post
+lastPost := &Post{ID: "abc123"}
+posts, err := client.GetPostsAfter(ctx, "golang", lastPost, 25)
+
+// Or continue from previous GetPosts results
+firstPagePosts, after, _ := client.GetPosts(ctx, "golang", nil)
+if len(firstPagePosts) > 0 {
+    nextPosts, err := client.GetPostsAfter(ctx, "golang", &firstPagePosts[len(firstPagePosts)-1], 25)
+}
+
+// Get all available posts (use with caution)
+allPosts, err := client.GetPostsAfter(ctx, "golang", nil, 0)
+```
+
+### GetComments
+
+Fetches comments for a post.
+
+```go
+post := &Post{ID: "abc123", Subreddit: "golang"}
+comments, err := post.GetComments(ctx)
+
+// With filtering options
+comments, err := post.GetComments(ctx, reddit.CommentsSince(timestamp))
 ```
 
 ## License

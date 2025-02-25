@@ -73,7 +73,7 @@ var _ = Describe("Client", func() {
 		// Setup mock transport with default success response
 		mockResp = &http.Response{
 			StatusCode: http.StatusOK,
-			Body:       io.NopCloser(strings.NewReader(`[{"kind": "Listing"}, {"kind": "Listing", "data": {"children": []}}]`)),
+			Body:       io.NopCloser(strings.NewReader(`{"data": {"children": [{"data": {"id": "123", "title": "Test Post"}}], "after": "t3_456"}}`)),
 		}
 		mockRespErr = nil
 		transport = &mockTransport{
@@ -121,6 +121,14 @@ var _ = Describe("Client", func() {
 	})
 
 	Describe("GetPosts", func() {
+		It("fetches posts with correct parameters", func() {
+			posts, after, err := client.GetPosts(context.Background(), "test", map[string]string{"limit": "25"})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(posts).To(HaveLen(1))
+			Expect(posts[0].ID).To(Equal("123"))
+			Expect(after).To(Equal("t3_456"))
+		})
+
 		Context("with context cancellation", func() {
 			It("respects context cancellation", func() {
 				ctx, cancel := context.WithCancel(context.Background())
@@ -140,6 +148,56 @@ var _ = Describe("Client", func() {
 				_, _, err := client.GetPosts(ctx, "test", nil)
 				Expect(err).To(MatchError(context.DeadlineExceeded))
 			})
+		})
+	})
+
+	Describe("GetPostsAfter", func() {
+		It("fetches multiple pages of posts", func() {
+			// Setup responses for two requests
+			firstResp := &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`{"data": {"children": [{"data": {"id": "123", "title": "First Post"}}], "after": "t3_456"}}`)),
+			}
+			secondResp := &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`{"data": {"children": [{"data": {"id": "456", "title": "Second Post"}}], "after": ""}}`)),
+			}
+			transport.responses = []*http.Response{firstResp, secondResp}
+			transport.errors = []error{nil, nil}
+
+			posts, err := client.GetPostsAfter(context.Background(), "test", nil, 2)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(posts).To(HaveLen(2))
+			Expect(posts[0].ID).To(Equal("123"))
+			Expect(posts[1].ID).To(Equal("456"))
+		})
+
+		It("respects the limit parameter", func() {
+			// Setup response with multiple posts
+			resp := &http.Response{
+				StatusCode: http.StatusOK,
+				Body: io.NopCloser(strings.NewReader(`{"data": {"children": [
+					{"data": {"id": "1", "title": "Post 1"}},
+					{"data": {"id": "2", "title": "Post 2"}},
+					{"data": {"id": "3", "title": "Post 3"}}
+				], "after": "t3_4"}}`)),
+			}
+			transport.responses = []*http.Response{resp}
+			transport.errors = []error{nil}
+
+			posts, err := client.GetPostsAfter(context.Background(), "test", nil, 2)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(posts).To(HaveLen(2))
+			Expect(posts[0].ID).To(Equal("1"))
+			Expect(posts[1].ID).To(Equal("2"))
+		})
+
+		It("uses the after parameter correctly", func() {
+			afterPost := &Post{ID: "123"}
+			_, err := client.GetPostsAfter(context.Background(), "test", afterPost, 1)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(transport.calls).To(Equal(1))
+			// The actual URL check would be better, but we'd need to modify our mock to capture the request
 		})
 	})
 

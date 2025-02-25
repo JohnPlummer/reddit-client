@@ -147,3 +147,8 @@ func CommentsSince(timestamp int64) CommentOption {
 		params["after"] = fmt.Sprintf("t1_%d", timestamp)
 	}
 }
+
+// Fullname returns the Reddit fullname identifier for this post (t3_<id>)
+func (p Post) Fullname() string {
+	return "t3_" + p.ID
+}
