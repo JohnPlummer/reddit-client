@@ -14,10 +14,10 @@ type Comment struct {
 	IngestedAt int64  `json:"-"` // When we stored it, not from Reddit API
 }
 
-// TODO: Implement these functions:
-// - GetPostComments(c *Client, subreddit, postID string) ([]Comment, error)
-// - GetCommentsSince(c *Client, timestamp int64) ([]Comment, error)
-// - Print(comments []Comment) - pretty print comments similar to Post.Print()
+// Fullname returns the Reddit fullname identifier for this comment (t1_<id>)
+func (c Comment) Fullname() string {
+	return "t1_" + c.ID
+}
 
 // parseComments extracts comments from the API response
 func parseComments(data []interface{}) ([]Comment, error) {

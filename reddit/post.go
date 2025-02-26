@@ -141,11 +141,49 @@ func (p *Post) GetComments(ctx context.Context, opts ...CommentOption) ([]Commen
 	return parseComments(data)
 }
 
-// CommentsSince returns a CommentOption that filters comments created after the given timestamp
-func CommentsSince(timestamp int64) CommentOption {
-	return func(params map[string]string) {
-		params["after"] = fmt.Sprintf("t1_%d", timestamp)
+// GetCommentsAfter fetches comments that come after the specified comment.
+// This method will automatically fetch multiple pages as needed up to the specified limit.
+// Set limit to 0 to fetch all available comments (use with caution).
+func (p *Post) GetCommentsAfter(ctx context.Context, after *Comment, limit int) ([]Comment, error) {
+	if p.client == nil {
+		return nil, fmt.Errorf("post has no associated client")
 	}
+
+	params := map[string]string{"limit": "100"}
+	if after != nil {
+		params["after"] = after.Fullname()
+	}
+
+	var allComments []Comment
+	for {
+		comments, err := p.GetComments(ctx, func(p map[string]string) {
+			for k, v := range params {
+				p[k] = v
+			}
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		allComments = append(allComments, comments...)
+
+		// Stop if we've reached the desired limit
+		if limit > 0 && len(allComments) >= limit {
+			allComments = allComments[:limit]
+			break
+		}
+
+		// Stop if there are no more comments
+		if len(comments) == 0 {
+			break
+		}
+
+		// Update the after parameter for the next request
+		lastComment := comments[len(comments)-1]
+		params["after"] = lastComment.Fullname()
+	}
+
+	return allComments, nil
 }
 
 // Fullname returns the Reddit fullname identifier for this post (t3_<id>)

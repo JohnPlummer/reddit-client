@@ -169,11 +169,20 @@ allPosts, err := client.GetPostsAfter(ctx, "golang", nil, 0)
 Fetches comments for a post.
 
 ```go
+// Get all comments for a post
 post := &Post{ID: "abc123", Subreddit: "golang"}
 comments, err := post.GetComments(ctx)
 
-// With filtering options
-comments, err := post.GetComments(ctx, reddit.CommentsSince(timestamp))
+// With pagination using GetCommentsAfter
+firstPageComments, err := post.GetComments(ctx)
+if err == nil && len(firstPageComments) > 0 {
+    // Get next page of comments after the last comment
+    comment := firstPageComments[len(firstPageComments)-1]  // Get the last comment
+    moreComments, err := post.GetCommentsAfter(ctx, &comment, 25)  // Pass its address
+}
+
+// Get all available comments starting from the beginning
+allComments, err := post.GetCommentsAfter(ctx, nil, 0)
 ```
 
 ## License

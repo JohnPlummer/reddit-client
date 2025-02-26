@@ -81,17 +81,24 @@ var _ = Describe("Post", func() {
 			Expect(comments[0].Body).To(Equal("comment1"))
 		})
 
-		It("handles comment filtering by timestamp", func() {
-			// Setup mock response for comments
-			commentsResp := &http.Response{
+		It("fetches comments after a specific comment", func() {
+			// Setup mock responses for paginated comments
+			firstPageResp := &http.Response{
 				StatusCode: http.StatusOK,
 				Body: io.NopCloser(strings.NewReader(`[
 					{},
 					{"data": {"children": [{"data": {"author": "user1", "body": "comment1", "created_utc": 1000, "id": "c1"}}]}}
 				]`)),
 			}
-			transport.Responses = append(transport.Responses, commentsResp)
-			transport.Errors = append(transport.Errors, nil)
+			secondPageResp := &http.Response{
+				StatusCode: http.StatusOK,
+				Body: io.NopCloser(strings.NewReader(`[
+					{},
+					{"data": {"children": [{"data": {"author": "user2", "body": "comment2", "created_utc": 1001, "id": "c2"}}]}}
+				]`)),
+			}
+			transport.Responses = append(transport.Responses, firstPageResp, secondPageResp)
+			transport.Errors = append(transport.Errors, nil, nil)
 
 			// Create a post through the public interface
 			posts, _, err := client.GetPosts(context.Background(), "golang", nil)
@@ -99,10 +106,18 @@ var _ = Describe("Post", func() {
 			Expect(posts).To(HaveLen(1))
 
 			post := posts[0]
-			comments, err := post.GetComments(context.Background(), reddit.CommentsSince(500))
 
+			// Get first page of comments
+			comments, err := post.GetComments(context.Background())
 			Expect(err).NotTo(HaveOccurred())
 			Expect(comments).To(HaveLen(1))
+			Expect(comments[0].ID).To(Equal("c1"))
+
+			// Get comments after the first comment
+			moreComments, err := post.GetCommentsAfter(context.Background(), &comments[0], 1)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(moreComments).To(HaveLen(1))
+			Expect(moreComments[0].ID).To(Equal("c2"))
 		})
 
 		It("handles errors", func() {
@@ -124,6 +139,18 @@ var _ = Describe("Post", func() {
 
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("server error"))
+		})
+	})
+
+	Describe("Comment", func() {
+		It("returns the correct fullname format", func() {
+			comment := reddit.Comment{ID: "abc123"}
+			Expect(comment.Fullname()).To(Equal("t1_abc123"))
+		})
+
+		It("handles empty ID", func() {
+			comment := reddit.Comment{}
+			Expect(comment.Fullname()).To(Equal("t1_"))
 		})
 	})
 })
