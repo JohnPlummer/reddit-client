@@ -54,7 +54,7 @@ func main() {
 	setupLogging(cfg.logLevel)
 
 	// Setup signal handling for graceful shutdown
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), cfg.readTimeout)
 	defer cancel()
 
 	sigChan := make(chan os.Signal, 1)
@@ -75,10 +75,6 @@ func main() {
 			return
 		}
 	}()
-
-	// Add timeout to context
-	ctx, cancel = context.WithTimeout(ctx, cfg.readTimeout)
-	defer cancel()
 
 	// Load .env file
 	if err := godotenv.Load(); err != nil {
@@ -193,13 +189,17 @@ FetchLoop:
 	// Cancel context to signal completion to goroutines
 	cancel()
 
+	// Cleanup signal handling
+	signal.Stop(sigChan)
+	close(sigChan)
+
+	// Wait for signal handler to complete
+	wg.Wait()
+
 	// Save results if output file is specified
 	if err := saveResult(cfg, result); err != nil {
 		slog.Error("failed to save results", "error", err)
 	}
-
-	// Wait for signal handler to complete
-	wg.Wait()
 }
 
 func parseFlags() *Config {
