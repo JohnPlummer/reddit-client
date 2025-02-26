@@ -1,4 +1,4 @@
-.PHONY: run-basic run-comprehensive run-examples test tidy tidy-examples
+.PHONY: run-basic run-comprehensive run-examples test tidy tidy-examples tidy-all lint lint-examples lint-all check
 
 # Run the basic example
 run-basic:
@@ -36,3 +36,30 @@ tidy-examples:
 
 # Run go mod tidy everywhere
 tidy-all: tidy tidy-examples
+
+# Run go fmt in root project
+lint:
+	@echo "Running go fmt in root project..."
+	go fmt ./...
+
+# Run go fmt in examples
+lint-examples:
+	@echo "Running go fmt in examples..."
+	cd examples/basic && go fmt ./...
+	cd examples/comprehensive && go fmt ./...
+
+# Run go fmt everywhere
+lint-all: lint lint-examples
+
+# Run all checks: tidy, lint, test, and run examples
+check:
+	@echo "Running all checks..."
+	@echo "Step 1: Running tidy-all..."
+	@make tidy-all
+	@echo "Step 2: Running lint-all..."
+	@make lint-all
+	@echo "Step 3: Running tests..."
+	@make test
+	@echo "Step 4: Running examples..."
+	@make run-examples
+	@echo "All checks completed successfully!"
