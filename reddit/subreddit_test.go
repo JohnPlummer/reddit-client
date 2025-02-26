@@ -1,74 +1,232 @@
-package reddit
+package reddit_test
 
 import (
-	"fmt"
+	"bytes"
+	"context"
+	"encoding/json"
+	"io"
+	"net/http"
+	"time"
 
+	"github.com/JohnPlummer/reddit-client/reddit"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
-// mockPostGetter implements PostGetter for testing
-type mockPostGetter struct {
-	posts     []Post
-	nextPage  string
+// mockTransport implements http.RoundTripper for testing
+type mockTransport struct {
+	responses map[string]*http.Response
 	err       error
-	callCount int
 }
 
-func (m *mockPostGetter) GetPosts(subreddit string, params map[string]string) ([]Post, string, error) {
+func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	if m.err != nil {
-		return nil, "", m.err
+		return nil, m.err
 	}
 
-	// For pagination test
-	if m.callCount == 0 {
-		m.callCount++
-		return m.posts, m.nextPage, nil
+	// Special handling for auth endpoint
+	if req.URL.Host == "www.reddit.com" && req.URL.Path == "/api/v1/access_token" {
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body: io.NopCloser(bytes.NewReader([]byte(`{
+				"access_token": "test_token",
+				"token_type": "bearer",
+				"expires_in": 3600
+			}`))),
+		}, nil
 	}
-	// Second call returns different posts with no next page
-	return []Post{{Title: "Post 2", ID: "2"}}, "", nil
+
+	// For API endpoints, try to match the path
+	if resp, ok := m.responses[req.URL.Path]; ok {
+		// Return a new response with a fresh body for each request
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			panic(err)
+		}
+		resp.Body.Close()
+		return &http.Response{
+			StatusCode: resp.StatusCode,
+			Body:       io.NopCloser(bytes.NewReader(body)),
+			Header:     make(http.Header),
+		}, nil
+	}
+
+	// Default response for unmatched paths
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       http.NoBody,
+		Header:     make(http.Header),
+	}, nil
+}
+
+func jsonResponse(data interface{}) *http.Response {
+	body, err := json.Marshal(data)
+	if err != nil {
+		panic(err)
+	}
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(bytes.NewReader(body)),
+	}
 }
 
 var _ = Describe("Subreddit", func() {
+	var (
+		transport *mockTransport
+		client    *reddit.Client
+		subreddit *reddit.Subreddit
+		ctx       context.Context
+		err       error
+	)
+
+	BeforeEach(func() {
+		transport = &mockTransport{
+			responses: make(map[string]*http.Response),
+		}
+		httpClient := &http.Client{Transport: transport}
+
+		// Create auth with our mock transport
+		auth, _ := reddit.NewAuth("test_client_id", "test_client_secret",
+			reddit.WithTimeout(1*time.Millisecond),
+			reddit.WithTransport(transport))
+
+		client, err = reddit.NewClient(auth, httpClient)
+		Expect(err).NotTo(HaveOccurred())
+		subreddit = reddit.NewSubreddit("golang", client)
+		ctx = context.Background()
+
+		// Set up default post response
+		transport.responses["/r/golang.json"] = jsonResponse(map[string]interface{}{
+			"data": map[string]interface{}{
+				"children": []interface{}{
+					map[string]interface{}{
+						"data": map[string]interface{}{
+							"title":        "First Post",
+							"selftext":     "Content 1",
+							"url":          "https://example.com/1",
+							"created_utc":  float64(time.Now().Unix()),
+							"subreddit":    "golang",
+							"id":           "post1",
+							"score":        float64(100),
+							"num_comments": float64(10),
+						},
+					},
+					map[string]interface{}{
+						"data": map[string]interface{}{
+							"title":        "Second Post",
+							"selftext":     "Content 2",
+							"url":          "https://example.com/2",
+							"created_utc":  float64(time.Now().Unix()),
+							"subreddit":    "golang",
+							"id":           "post2",
+							"score":        float64(200),
+							"num_comments": float64(20),
+						},
+					},
+				},
+				"after": "t3_post2",
+			},
+		})
+	})
+
+	Describe("NewSubreddit", func() {
+		It("creates a new subreddit instance", func() {
+			sub := reddit.NewSubreddit("test", client)
+			Expect(sub).NotTo(BeNil())
+			Expect(sub.Name).To(Equal("test"))
+		})
+	})
+
 	Describe("GetPosts", func() {
-		It("fetches posts from a subreddit", func() {
-			mockPosts := []Post{
-				{Title: "Post 1", ID: "1"},
-				{Title: "Post 2", ID: "2"},
-			}
-			client := &mockPostGetter{posts: mockPosts}
-
-			subreddit := Subreddit{Name: "golang"}
-			posts, err := subreddit.GetPosts(client, "new", 2)
-
-			Expect(err).NotTo(HaveOccurred())
-			Expect(posts).To(Equal(mockPosts))
+		BeforeEach(func() {
+			// Mock response for /r/golang.json
+			transport.responses["/r/golang.json"] = jsonResponse(map[string]interface{}{
+				"data": map[string]interface{}{
+					"children": []interface{}{
+						map[string]interface{}{
+							"data": map[string]interface{}{
+								"title":        "First Post",
+								"selftext":     "Content 1",
+								"url":          "https://example.com/1",
+								"created_utc":  float64(time.Now().Unix()),
+								"subreddit":    "golang",
+								"id":           "post1",
+								"score":        float64(100),
+								"num_comments": float64(10),
+							},
+						},
+						map[string]interface{}{
+							"data": map[string]interface{}{
+								"title":        "Second Post",
+								"selftext":     "Content 2",
+								"url":          "https://example.com/2",
+								"created_utc":  float64(time.Now().Unix()),
+								"subreddit":    "golang",
+								"id":           "post2",
+								"score":        float64(200),
+								"num_comments": float64(20),
+							},
+						},
+					},
+					"after": "t3_post2",
+				},
+			})
 		})
 
-		It("handles pagination", func() {
-			firstPage := []Post{{Title: "Post 1", ID: "1"}}
-			client := &mockPostGetter{
-				posts:    firstPage,
-				nextPage: "t3_123",
-			}
-
-			subreddit := Subreddit{Name: "golang"}
-			posts, err := subreddit.GetPosts(client, "new", 2)
-
+		It("fetches posts with the specified parameters", func() {
+			posts, err := subreddit.GetPosts(ctx, "new", 2)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(posts).To(HaveLen(2))
-			Expect(posts[0].Title).To(Equal("Post 1"))
-			Expect(posts[1].Title).To(Equal("Post 2"))
+			Expect(posts[0].Title).To(Equal("First Post"))
+			Expect(posts[1].Title).To(Equal("Second Post"))
 		})
 
-		It("handles errors", func() {
-			client := &mockPostGetter{err: fmt.Errorf("API error")}
+		It("respects the totalPosts limit", func() {
+			posts, err := subreddit.GetPosts(ctx, "new", 1)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(posts).To(HaveLen(1))
+			Expect(posts[0].Title).To(Equal("First Post"))
+		})
 
-			subreddit := Subreddit{Name: "golang"}
-			_, err := subreddit.GetPosts(client, "new", 2)
+		It("applies subreddit options", func() {
+			timestamp := time.Now().Unix()
+			posts, err := subreddit.GetPosts(ctx, "new", 1, reddit.Since(timestamp))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(posts).To(HaveLen(1))
+			Expect(posts[0].Title).To(Equal("First Post"))
+		})
+	})
 
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("API error"))
+	Describe("GetPostsAfter", func() {
+		BeforeEach(func() {
+			// Mock response for /r/golang.json?after=t3_post1
+			transport.responses["/r/golang.json"] = jsonResponse(map[string]interface{}{
+				"data": map[string]interface{}{
+					"children": []interface{}{
+						map[string]interface{}{
+							"data": map[string]interface{}{
+								"title":        "Third Post",
+								"selftext":     "Content 3",
+								"url":          "https://example.com/3",
+								"created_utc":  float64(time.Now().Unix()),
+								"subreddit":    "golang",
+								"id":           "post3",
+								"score":        float64(300),
+								"num_comments": float64(30),
+							},
+						},
+					},
+					"after": "",
+				},
+			})
+		})
+
+		It("fetches posts after the specified post", func() {
+			afterPost := &reddit.Post{ID: "post1"}
+			posts, err := subreddit.GetPostsAfter(ctx, afterPost, 2)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(posts).To(HaveLen(1))
+			Expect(posts[0].Title).To(Equal("Third Post"))
 		})
 	})
 })

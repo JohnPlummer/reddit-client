@@ -1,6 +1,9 @@
 package reddit
 
-import "time"
+import (
+	"net/http"
+	"time"
+)
 
 // Option represents a configuration option that can be applied to various components
 type Option interface {
@@ -45,6 +48,18 @@ func (TimeoutOption) isOption() {}
 // WithTimeout sets the timeout for API requests
 func WithTimeout(timeout time.Duration) Option {
 	return TimeoutOption{Timeout: timeout}
+}
+
+// TransportOption configures the HTTP transport
+type TransportOption struct {
+	Transport http.RoundTripper
+}
+
+func (TransportOption) isOption() {}
+
+// WithTransport sets a custom transport for HTTP requests
+func WithTransport(transport http.RoundTripper) Option {
+	return TransportOption{Transport: transport}
 }
 
 // DefaultOptions returns the default set of options
