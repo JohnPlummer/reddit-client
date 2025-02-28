@@ -156,13 +156,14 @@ func (p *Post) GetCommentsAfter(ctx context.Context, after *Comment, limit int) 
 
 	var allComments []Comment
 	for {
-		comments, err := p.GetComments(ctx, func(p map[string]string) {
-			for k, v := range params {
-				p[k] = v
-			}
-		})
+		data, err := p.client.getComments(ctx, p.Subreddit, p.ID, params)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("fetching comments after: %w", err)
+		}
+
+		comments, err := parseComments(data)
+		if err != nil {
+			return nil, fmt.Errorf("parsing comments after: %w", err)
 		}
 
 		allComments = append(allComments, comments...)

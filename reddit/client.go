@@ -19,11 +19,6 @@ type Client struct {
 	rateLimiter *RateLimiter
 }
 
-// SetHTTPClient sets the HTTP client (used for testing)
-func (c *Client) SetHTTPClient(client *http.Client) {
-	c.client = client
-}
-
 // request performs an HTTP request with rate limiting and error handling
 func (c *Client) request(ctx context.Context, method, endpoint string) (*http.Response, error) {
 	if err := c.Auth.EnsureValidToken(ctx); err != nil {
@@ -92,8 +87,8 @@ func (c *Client) getComments(ctx context.Context, subreddit, postID string, para
 	return data, nil
 }
 
-// GetPosts fetches a single page of posts from a subreddit
-func (c *Client) GetPosts(ctx context.Context, subreddit string, params map[string]string) ([]Post, string, error) {
+// getPosts fetches a single page of posts from a subreddit
+func (c *Client) getPosts(ctx context.Context, subreddit string, params map[string]string) ([]Post, string, error) {
 	endpoint := fmt.Sprintf("/r/%s.json", subreddit)
 	if len(params) > 0 {
 		endpoint += "?"
@@ -117,13 +112,13 @@ func (c *Client) GetPosts(ctx context.Context, subreddit string, params map[stri
 	return parsePosts(data, c)
 }
 
-// GetPostsAfter fetches posts from a subreddit that come after the specified post.
+// getPostsAfter fetches posts from a subreddit that come after the specified post.
 // This method will automatically fetch multiple pages as needed up to the specified limit.
 // Set limit to 0 to fetch all available posts (use with caution).
 //
 // This is useful for implementing infinite scroll or pagination. The posts are returned
 // in chronological order (newest first).
-func (c *Client) GetPostsAfter(ctx context.Context, subreddit string, after *Post, limit int) ([]Post, error) {
+func (c *Client) getPostsAfter(ctx context.Context, subreddit string, after *Post, limit int) ([]Post, error) {
 	params := map[string]string{"limit": "100"}
 	var allPosts []Post
 
@@ -133,7 +128,7 @@ func (c *Client) GetPostsAfter(ctx context.Context, subreddit string, after *Pos
 	}
 
 	for {
-		posts, nextAfter, err := c.GetPosts(ctx, subreddit, params)
+		posts, nextAfter, err := c.getPosts(ctx, subreddit, params)
 		if err != nil {
 			return nil, err
 		}
@@ -159,15 +154,19 @@ func (c *Client) GetPostsAfter(ctx context.Context, subreddit string, after *Pos
 }
 
 // NewClient creates a new Reddit client
-func NewClient(auth *Auth, opts ...Option) (*Client, error) {
+func NewClient(auth *Auth, httpClient *http.Client, opts ...Option) (*Client, error) {
 	if auth == nil {
 		return nil, ErrMissingCredentials
 	}
 
 	c := &Client{
 		Auth:        auth,
-		client:      &http.Client{},
+		client:      httpClient,
 		rateLimiter: NewRateLimiter(60, 5), // Default to 60 requests per minute with burst of 5
+	}
+
+	if c.client == nil {
+		c.client = &http.Client{}
 	}
 
 	// Apply options

@@ -124,11 +124,19 @@ func NewAuth(clientID, clientSecret string, opts ...Option) (*Auth, error) {
 			auth.userAgent = o.UserAgent
 		case TimeoutOption:
 			auth.timeout = o.Timeout
+		case TransportOption:
+			auth.client = &http.Client{
+				Transport: o.Transport,
+				Timeout:   auth.timeout,
+			}
 		}
 	}
 
-	auth.client = &http.Client{
-		Timeout: auth.timeout,
+	// Create default client if none was set by options
+	if auth.client == nil {
+		auth.client = &http.Client{
+			Timeout: auth.timeout,
+		}
 	}
 
 	slog.Debug("creating new auth client",

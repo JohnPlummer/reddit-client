@@ -1,6 +1,9 @@
 package reddit
 
-import "fmt"
+import (
+	"context"
+	"fmt"
+)
 
 // PostGetter defines the interface for fetching posts from Reddit
 type PostGetter interface {
@@ -9,14 +12,23 @@ type PostGetter interface {
 
 // Subreddit represents a Reddit subreddit
 type Subreddit struct {
-	Name string
+	Name   string
+	client *Client
 }
 
 // SubredditOption is a function type for modifying subreddit request parameters
 type SubredditOption func(params map[string]string)
 
+// NewSubreddit creates a new Subreddit instance
+func NewSubreddit(name string, client *Client) *Subreddit {
+	return &Subreddit{
+		Name:   name,
+		client: client,
+	}
+}
+
 // GetPosts fetches posts from the subreddit
-func (s Subreddit) GetPosts(client PostGetter, sort string, totalPosts int, opts ...SubredditOption) ([]Post, error) {
+func (s *Subreddit) GetPosts(ctx context.Context, sort string, totalPosts int, opts ...SubredditOption) ([]Post, error) {
 	params := map[string]string{
 		"limit": "100",
 		"sort":  sort,
@@ -34,7 +46,7 @@ func (s Subreddit) GetPosts(client PostGetter, sort string, totalPosts int, opts
 			params["after"] = after
 		}
 
-		posts, nextPage, err := client.GetPosts(s.Name, params)
+		posts, nextPage, err := s.client.getPosts(ctx, s.Name, params)
 		if err != nil {
 			return nil, err
 		}
@@ -51,6 +63,11 @@ func (s Subreddit) GetPosts(client PostGetter, sort string, totalPosts int, opts
 	}
 
 	return allPosts, nil
+}
+
+// GetPostsAfter fetches posts from the subreddit that come after the specified post
+func (s *Subreddit) GetPostsAfter(ctx context.Context, after *Post, limit int) ([]Post, error) {
+	return s.client.getPostsAfter(ctx, s.Name, after, limit)
 }
 
 // Since returns a SubredditOption that filters posts created after the given timestamp

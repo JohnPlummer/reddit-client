@@ -6,9 +6,9 @@ import (
 	"flag"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
-	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -95,11 +95,14 @@ func main() {
 	}
 
 	// Create a new client
-	client, err := reddit.NewClient(auth)
+	client, err := reddit.NewClient(auth, &http.Client{})
 	if err != nil {
 		slog.Error("failed to create client", "error", err)
 		os.Exit(1)
 	}
+
+	// Create a subreddit instance
+	subreddit := reddit.NewSubreddit(cfg.subreddit, client)
 
 	// Initialize result
 	result := Result{
@@ -109,7 +112,7 @@ func main() {
 	}
 
 	// Get posts with pagination
-	var after string
+	var lastPost *reddit.Post
 	pageCount := 0
 	totalPosts := 0
 
@@ -125,18 +128,18 @@ FetchLoop:
 		// Show progress
 		fmt.Printf("\rFetching page %d/%d...", pageCount+1, cfg.maxPages)
 
-		// Parameters for the request
-		params := map[string]string{
-			"limit": fmt.Sprintf("%d", cfg.limit),
-			"sort":  cfg.sort,
-			"t":     cfg.timeframe,
-		}
-		if after != "" {
-			params["after"] = after
+		// Get posts for current page
+		var posts []reddit.Post
+		var err error
+
+		if lastPost == nil {
+			// First page
+			posts, err = subreddit.GetPosts(ctx, cfg.sort, cfg.limit)
+		} else {
+			// Subsequent pages
+			posts, err = subreddit.GetPostsAfter(ctx, lastPost, cfg.limit)
 		}
 
-		// Get posts for current page
-		posts, nextAfter, err := client.GetPosts(ctx, cfg.subreddit, params)
 		if err != nil {
 			slog.Error("Error getting posts", "error", err, "page", pageCount+1)
 			result.Error = fmt.Sprintf("error fetching page %d: %v", pageCount+1, err)
@@ -171,11 +174,11 @@ FetchLoop:
 		result.TotalPosts = totalPosts
 
 		// Check if we have more pages
-		if nextAfter == "" || len(posts) == 0 {
+		if len(posts) == 0 {
 			break
 		}
 
-		after = nextAfter
+		lastPost = &posts[len(posts)-1]
 		pageCount++
 	}
 
@@ -250,20 +253,8 @@ func validateConfig(cfg *Config) error {
 		"debug": true, "info": true,
 		"warn": true, "error": true,
 	}
-	if !validLogLevels[strings.ToLower(cfg.logLevel)] {
+	if !validLogLevels[cfg.logLevel] {
 		return fmt.Errorf("invalid log level: %s", cfg.logLevel)
-	}
-
-	if cfg.rateLimit < 1 {
-		return fmt.Errorf("rate-limit must be at least 1")
-	}
-
-	if cfg.rateBurst < cfg.rateLimit {
-		return fmt.Errorf("rate-burst must be greater than or equal to rate-limit")
-	}
-
-	if cfg.readTimeout < time.Second {
-		return fmt.Errorf("timeout must be at least 1 second")
 	}
 
 	return nil
@@ -271,7 +262,7 @@ func validateConfig(cfg *Config) error {
 
 func setupLogging(level string) {
 	var logLevel slog.Level
-	switch strings.ToLower(level) {
+	switch level {
 	case "debug":
 		logLevel = slog.LevelDebug
 	case "info":
@@ -287,8 +278,7 @@ func setupLogging(level string) {
 	opts := &slog.HandlerOptions{
 		Level: logLevel,
 	}
-
-	handler := slog.NewTextHandler(os.Stdout, opts)
+	handler := slog.NewTextHandler(os.Stderr, opts)
 	logger := slog.New(handler)
 	slog.SetDefault(logger)
 }
@@ -298,18 +288,15 @@ func saveResult(cfg *Config, result Result) error {
 		return nil
 	}
 
-	file, err := os.Create(cfg.outputFile)
+	data, err := json.MarshalIndent(result, "", "  ")
 	if err != nil {
-		return fmt.Errorf("failed to create output file: %w", err)
-	}
-	defer file.Close()
-
-	encoder := json.NewEncoder(file)
-	encoder.SetIndent("", "  ")
-	if err := encoder.Encode(result); err != nil {
-		return fmt.Errorf("failed to encode result: %w", err)
+		return fmt.Errorf("marshaling result: %w", err)
 	}
 
-	slog.Info("results saved to file", "path", cfg.outputFile)
+	if err := os.WriteFile(cfg.outputFile, data, 0644); err != nil {
+		return fmt.Errorf("writing output file: %w", err)
+	}
+
+	slog.Info("saved results to file", "path", cfg.outputFile)
 	return nil
 }

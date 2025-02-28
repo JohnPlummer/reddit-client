@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"time"
 
@@ -32,16 +33,16 @@ func main() {
 	}
 
 	// Create a new client
-	client, err := reddit.NewClient(auth)
+	client, err := reddit.NewClient(auth, &http.Client{})
 	if err != nil {
 		log.Fatal("Failed to create client:", err)
 	}
 
+	// Create a subreddit instance
+	subreddit := reddit.NewSubreddit("golang", client)
+
 	// Get latest posts from r/golang
-	posts, _, err := client.GetPosts(ctx, "golang", map[string]string{
-		"limit": "5",
-		"sort":  "new",
-	})
+	posts, err := subreddit.GetPosts(ctx, "new", 5)
 	if err != nil {
 		log.Fatal("Error getting posts:", err)
 	}
