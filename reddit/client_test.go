@@ -10,14 +10,16 @@ import (
 
 var _ = Describe("Client", func() {
 	var (
-		transport *mockTransport
-		auth      *reddit.Auth
+		transport  *mockTransport
+		auth       *reddit.Auth
+		mockClient *http.Client
 	)
 
 	BeforeEach(func() {
 		transport = &mockTransport{
 			responses: make(map[string]*http.Response),
 		}
+		mockClient = &http.Client{Transport: transport}
 
 		var err error
 		auth, err = reddit.NewAuth("test_id", "test_secret",
@@ -29,7 +31,7 @@ var _ = Describe("Client", func() {
 		It("creates a client with default options", func() {
 			client, err := reddit.NewClient(
 				reddit.WithAuth(auth),
-				reddit.WithTransport(transport),
+				reddit.WithHTTPClient(mockClient),
 			)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(client).NotTo(BeNil())
@@ -38,7 +40,7 @@ var _ = Describe("Client", func() {
 		It("creates a client with multiple custom options", func() {
 			client, err := reddit.NewClient(
 				reddit.WithAuth(auth),
-				reddit.WithTransport(transport),
+				reddit.WithHTTPClient(mockClient),
 				reddit.WithUserAgent("custom-agent"),
 				reddit.WithRateLimit(30, 3),
 			)
@@ -49,7 +51,7 @@ var _ = Describe("Client", func() {
 		It("creates a client with custom user agent", func() {
 			client, err := reddit.NewClient(
 				reddit.WithAuth(auth),
-				reddit.WithTransport(transport),
+				reddit.WithHTTPClient(mockClient),
 				reddit.WithUserAgent("test-bot/1.0"),
 			)
 			Expect(err).NotTo(HaveOccurred())
@@ -59,7 +61,7 @@ var _ = Describe("Client", func() {
 		It("creates a client with custom rate limiting", func() {
 			client, err := reddit.NewClient(
 				reddit.WithAuth(auth),
-				reddit.WithTransport(transport),
+				reddit.WithHTTPClient(mockClient),
 				reddit.WithRateLimit(45, 4),
 			)
 			Expect(err).NotTo(HaveOccurred())

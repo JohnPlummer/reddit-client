@@ -32,13 +32,12 @@ func WithTimeout(timeout time.Duration) ClientOption {
 	}
 }
 
-// WithTransport sets a custom transport for HTTP requests
-func WithTransport(transport http.RoundTripper) ClientOption {
+// WithHTTPClient sets the HTTP client used for making requests.
+// This allows for complete customization of HTTP behavior including
+// transport, timeout, cookies, and redirects.
+func WithHTTPClient(client *http.Client) ClientOption {
 	return func(c *Client) {
-		if c.client == nil {
-			c.client = &http.Client{}
-		}
-		c.client.Transport = transport
+		c.client = client
 	}
 }
 
@@ -46,13 +45,6 @@ func WithTransport(transport http.RoundTripper) ClientOption {
 func WithAuth(auth *Auth) ClientOption {
 	return func(c *Client) {
 		c.Auth = auth
-	}
-}
-
-// WithHTTPClient sets the HTTP client
-func WithHTTPClient(client *http.Client) ClientOption {
-	return func(c *Client) {
-		c.client = client
 	}
 }
 

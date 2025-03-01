@@ -72,16 +72,18 @@ func jsonResponse(data interface{}) *http.Response {
 
 var _ = Describe("Subreddit", func() {
 	var (
-		transport *mockTransport
-		client    *reddit.Client
-		subreddit *reddit.Subreddit
-		ctx       context.Context
+		transport  *mockTransport
+		client     *reddit.Client
+		subreddit  *reddit.Subreddit
+		ctx        context.Context
+		mockClient *http.Client
 	)
 
 	BeforeEach(func() {
 		transport = &mockTransport{
 			responses: make(map[string]*http.Response),
 		}
+		mockClient = &http.Client{Transport: transport}
 
 		// Create auth with our mock transport
 		auth, err := reddit.NewAuth("test_client_id", "test_client_secret",
@@ -91,7 +93,7 @@ var _ = Describe("Subreddit", func() {
 		// Create client with auth and custom transport
 		client, err = reddit.NewClient(
 			reddit.WithAuth(auth),
-			reddit.WithTransport(transport),
+			reddit.WithHTTPClient(mockClient),
 			reddit.WithUserAgent("test-bot/1.0"),
 		)
 		Expect(err).NotTo(HaveOccurred())
