@@ -76,22 +76,26 @@ var _ = Describe("Subreddit", func() {
 		client    *reddit.Client
 		subreddit *reddit.Subreddit
 		ctx       context.Context
-		err       error
 	)
 
 	BeforeEach(func() {
 		transport = &mockTransport{
 			responses: make(map[string]*http.Response),
 		}
-		httpClient := &http.Client{Transport: transport}
 
 		// Create auth with our mock transport
-		auth, _ := reddit.NewAuth("test_client_id", "test_client_secret",
-			reddit.WithTimeout(1*time.Millisecond),
-			reddit.WithTransport(transport))
-
-		client, err = reddit.NewClient(auth, httpClient)
+		auth, err := reddit.NewAuth("test_client_id", "test_client_secret",
+			reddit.WithAuthTransport(transport))
 		Expect(err).NotTo(HaveOccurred())
+
+		// Create client with auth and custom transport
+		client, err = reddit.NewClient(
+			reddit.WithAuth(auth),
+			reddit.WithTransport(transport),
+			reddit.WithUserAgent("test-bot/1.0"),
+		)
+		Expect(err).NotTo(HaveOccurred())
+
 		subreddit = reddit.NewSubreddit("golang", client)
 		ctx = context.Background()
 

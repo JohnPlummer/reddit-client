@@ -153,36 +153,32 @@ func (c *Client) getPostsAfter(ctx context.Context, subreddit string, after *Pos
 	return allPosts, nil
 }
 
-// NewClient creates a new Reddit client
-func NewClient(auth *Auth, httpClient *http.Client, opts ...Option) (*Client, error) {
-	if auth == nil {
-		return nil, ErrMissingCredentials
-	}
-
+// NewClient creates a new Reddit client with the provided options
+func NewClient(opts ...ClientOption) (*Client, error) {
+	// Start with default options
 	c := &Client{
-		Auth:        auth,
-		client:      httpClient,
 		rateLimiter: NewRateLimiter(60, 5), // Default to 60 requests per minute with burst of 5
-	}
-
-	if c.client == nil {
-		c.client = &http.Client{}
+		userAgent:   "golang:reddit-client:v1.0",
+		client:      &http.Client{}, // Default HTTP client
 	}
 
 	// Apply options
 	for _, opt := range opts {
-		switch o := opt.(type) {
-		case UserAgentOption:
-			c.userAgent = o.UserAgent
-		case RateLimitOption:
-			c.rateLimiter = NewRateLimiter(o.RequestsPerMinute, o.BurstSize)
-		case TimeoutOption:
-			c.client.Timeout = o.Timeout
+		opt(c)
+	}
+
+	// Validate required configuration
+	if c.Auth == nil {
+		// Create default Auth if none provided
+		var err error
+		c.Auth, err = NewAuth("", "", WithAuthUserAgent(c.userAgent))
+		if err != nil {
+			return nil, fmt.Errorf("creating default auth client: %w", err)
 		}
 	}
 
-	if c.userAgent == "" {
-		c.userAgent = "golang:reddit-client:v1.0"
+	if c.client == nil {
+		c.client = &http.Client{} // Ensure we always have an HTTP client
 	}
 
 	slog.Debug("creating new client",

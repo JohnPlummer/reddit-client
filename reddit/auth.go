@@ -102,7 +102,7 @@ func (a *Auth) EnsureValidToken(ctx context.Context) error {
 }
 
 // NewAuth creates a new Auth instance with the provided credentials
-func NewAuth(clientID, clientSecret string, opts ...Option) (*Auth, error) {
+func NewAuth(clientID, clientSecret string, opts ...AuthOption) (*Auth, error) {
 	if clientID == "" {
 		return nil, ErrMissingCredentials
 	}
@@ -119,17 +119,7 @@ func NewAuth(clientID, clientSecret string, opts ...Option) (*Auth, error) {
 
 	// Apply options
 	for _, opt := range opts {
-		switch o := opt.(type) {
-		case UserAgentOption:
-			auth.userAgent = o.UserAgent
-		case TimeoutOption:
-			auth.timeout = o.Timeout
-		case TransportOption:
-			auth.client = &http.Client{
-				Transport: o.Transport,
-				Timeout:   auth.timeout,
-			}
-		}
+		opt(auth)
 	}
 
 	// Create default client if none was set by options

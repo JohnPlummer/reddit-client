@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"net/http"
 	"os"
 	"time"
 
@@ -26,14 +25,15 @@ func main() {
 	auth, err := reddit.NewAuth(
 		os.Getenv("REDDIT_CLIENT_ID"),
 		os.Getenv("REDDIT_CLIENT_SECRET"),
-		reddit.WithUserAgent("MyRedditBot/1.0"),
 	)
 	if err != nil {
 		log.Fatal("Failed to create auth client:", err)
 	}
 
-	// Create a new client
-	client, err := reddit.NewClient(auth, &http.Client{})
+	// Create a new client with default options
+	client, err := reddit.NewClient(
+		reddit.WithAuth(auth),
+	)
 	if err != nil {
 		log.Fatal("Failed to create client:", err)
 	}

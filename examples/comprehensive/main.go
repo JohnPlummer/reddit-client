@@ -6,7 +6,6 @@ import (
 	"flag"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"os"
 	"os/signal"
 	"sync"
@@ -86,8 +85,7 @@ func main() {
 	auth, err := reddit.NewAuth(
 		os.Getenv("REDDIT_CLIENT_ID"),
 		os.Getenv("REDDIT_CLIENT_SECRET"),
-		reddit.WithUserAgent("MyRedditBot/1.0"),
-		reddit.WithRateLimit(cfg.rateLimit, cfg.rateBurst),
+		reddit.WithAuthUserAgent("MyRedditBot/1.0"),
 	)
 	if err != nil {
 		slog.Error("failed to create auth client", "error", err)
@@ -95,7 +93,11 @@ func main() {
 	}
 
 	// Create a new client
-	client, err := reddit.NewClient(auth, &http.Client{})
+	client, err := reddit.NewClient(
+		reddit.WithAuth(auth),
+		reddit.WithUserAgent("MyRedditBot/1.0"),
+		reddit.WithRateLimit(cfg.rateLimit, cfg.rateBurst),
+	)
 	if err != nil {
 		slog.Error("failed to create client", "error", err)
 		os.Exit(1)
