@@ -194,11 +194,20 @@ func NewClient(opts ...ClientOption) (*Client, error) {
 		c.client = &http.Client{} // Ensure we always have an HTTP client
 	}
 
-	slog.Debug("creating new client",
-		"user_agent", c.userAgent,
-		"rate_limit", c.rateLimiter.limiter.Limit(),
-		"burst", c.rateLimiter.limiter.Burst(),
-	)
+	slog.Debug("creating new client", "client", c)
 
 	return c, nil
+}
+
+// String returns a string representation of the Client struct, safely handling sensitive data
+func (c *Client) String() string {
+	if c == nil {
+		return "Client<nil>"
+	}
+
+	return fmt.Sprintf("Client{Auth: %v, UserAgent: %q, RateLimiter: %v}",
+		c.Auth,
+		c.userAgent,
+		c.rateLimiter,
+	)
 }

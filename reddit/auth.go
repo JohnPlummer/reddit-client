@@ -129,12 +129,34 @@ func NewAuth(clientID, clientSecret string, opts ...AuthOption) (*Auth, error) {
 		}
 	}
 
-	slog.Debug("creating new auth client",
-		"client_id", clientID,
-		"client_secret", clientSecret[:4]+"...", // Only show first 4 chars of secret
-		"user_agent", auth.userAgent,
-		"timeout", auth.timeout,
-	)
+	slog.Debug("creating new auth client", "auth", auth)
 
 	return auth, nil
+}
+
+// String returns a string representation of the Auth struct, safely handling sensitive data
+func (a *Auth) String() string {
+	if a == nil {
+		return "Auth<nil>"
+	}
+
+	// Only obfuscate sensitive data (client secret and token)
+	clientSecret := a.ClientSecret
+	if len(clientSecret) > 4 {
+		clientSecret = clientSecret[:4] + "..."
+	}
+
+	token := a.Token
+	if len(token) > 4 {
+		token = token[:4] + "..."
+	}
+
+	return fmt.Sprintf("Auth{ClientID: %q, ClientSecret: %q, Token: %q, ExpiresAt: %v, UserAgent: %q, Timeout: %v}",
+		a.ClientID, // Show full client ID as it's public
+		clientSecret,
+		token,
+		a.ExpiresAt,
+		a.userAgent,
+		a.timeout,
+	)
 }

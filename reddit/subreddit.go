@@ -2,6 +2,7 @@ package reddit
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 )
 
@@ -58,4 +59,16 @@ func (s *Subreddit) GetPosts(ctx context.Context, opts ...SubredditOption) ([]Po
 // Set limit to 0 to fetch all available posts (use with caution).
 func (s *Subreddit) GetPostsAfter(ctx context.Context, after *Post, limit int) ([]Post, error) {
 	return s.client.getPosts(ctx, s.Name, WithAfter(after), WithLimit(limit))
+}
+
+// String returns a string representation of the Subreddit struct
+func (s *Subreddit) String() string {
+	if s == nil {
+		return "Subreddit<nil>"
+	}
+
+	return fmt.Sprintf("Subreddit{Name: %q, Client: %v}",
+		s.Name,
+		s.client,
+	)
 }
