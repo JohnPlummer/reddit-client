@@ -2,6 +2,7 @@ package reddit
 
 import (
 	"net/http"
+	"strconv"
 	"time"
 )
 
@@ -45,6 +46,27 @@ func WithHTTPClient(client *http.Client) ClientOption {
 func WithAuth(auth *Auth) ClientOption {
 	return func(c *Client) {
 		c.Auth = auth
+	}
+}
+
+// PostOption is a function type for modifying post request parameters
+type PostOption func(params map[string]string)
+
+// WithAfter returns a PostOption that sets the "after" parameter for pagination
+func WithAfter(after *Post) PostOption {
+	return func(params map[string]string) {
+		if after != nil {
+			params["after"] = after.Fullname()
+		}
+	}
+}
+
+// WithLimit returns a PostOption that sets the "limit" parameter
+func WithLimit(limit int) PostOption {
+	return func(params map[string]string) {
+		if limit > 0 {
+			params["limit"] = strconv.Itoa(limit)
+		}
 	}
 }
 

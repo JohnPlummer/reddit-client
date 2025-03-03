@@ -87,48 +87,27 @@ func (c *Client) getComments(ctx context.Context, subreddit, postID string, para
 	return data, nil
 }
 
-// getPosts fetches a single page of posts from a subreddit
-func (c *Client) getPosts(ctx context.Context, subreddit string, params map[string]string) ([]Post, string, error) {
-	endpoint := fmt.Sprintf("/r/%s.json", subreddit)
-	if len(params) > 0 {
-		endpoint += "?"
-		for k, v := range params {
-			endpoint += fmt.Sprintf("%s=%s&", k, v)
-		}
-		endpoint = endpoint[:len(endpoint)-1] // Remove trailing &
-	}
-
-	resp, err := c.request(ctx, "GET", endpoint)
-	if err != nil {
-		return nil, "", err
-	}
-	defer resp.Body.Close()
-
-	var data map[string]interface{}
-	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-		return nil, "", fmt.Errorf("decoding response: %w", err)
-	}
-
-	return parsePosts(data, c)
-}
-
-// getPostsAfter fetches posts from a subreddit that come after the specified post.
+// getPosts fetches posts from a subreddit with optional pagination and filtering.
 // This method will automatically fetch multiple pages as needed up to the specified limit.
 // Set limit to 0 to fetch all available posts (use with caution).
-//
-// This is useful for implementing infinite scroll or pagination. The posts are returned
-// in chronological order (newest first).
-func (c *Client) getPostsAfter(ctx context.Context, subreddit string, after *Post, limit int) ([]Post, error) {
-	params := map[string]string{"limit": "100"}
-	var allPosts []Post
+func (c *Client) getPosts(ctx context.Context, subreddit string, opts ...PostOption) ([]Post, error) {
+	params := map[string]string{
+		"limit": "100", // Default limit
+	}
 
-	// If after is provided, use its fullname as the after cursor
-	if after != nil {
-		params["after"] = after.Fullname()
+	// Apply options
+	for _, opt := range opts {
+		opt(params)
+	}
+
+	var allPosts []Post
+	limit := 0
+	if limitStr, ok := params["limit"]; ok {
+		limit, _ = strconv.Atoi(limitStr)
 	}
 
 	for {
-		posts, nextAfter, err := c.getPosts(ctx, subreddit, params)
+		posts, nextAfter, err := c.getPostsPage(ctx, subreddit, params)
 		if err != nil {
 			return nil, err
 		}
@@ -151,6 +130,31 @@ func (c *Client) getPostsAfter(ctx context.Context, subreddit string, after *Pos
 	}
 
 	return allPosts, nil
+}
+
+// getPostsPage fetches a single page of posts from a subreddit
+func (c *Client) getPostsPage(ctx context.Context, subreddit string, params map[string]string) ([]Post, string, error) {
+	endpoint := fmt.Sprintf("/r/%s.json", subreddit)
+	if len(params) > 0 {
+		endpoint += "?"
+		for k, v := range params {
+			endpoint += fmt.Sprintf("%s=%s&", k, v)
+		}
+		endpoint = endpoint[:len(endpoint)-1] // Remove trailing &
+	}
+
+	resp, err := c.request(ctx, "GET", endpoint)
+	if err != nil {
+		return nil, "", err
+	}
+	defer resp.Body.Close()
+
+	var data map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		return nil, "", fmt.Errorf("decoding response: %w", err)
+	}
+
+	return parsePosts(data, c)
 }
 
 // NewClient creates a new Reddit client with the provided options

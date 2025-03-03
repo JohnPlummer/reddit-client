@@ -136,7 +136,10 @@ FetchLoop:
 
 		if lastPost == nil {
 			// First page
-			posts, err = subreddit.GetPosts(ctx, cfg.sort, cfg.limit)
+			posts, err = subreddit.GetPosts(ctx,
+				reddit.WithSort(cfg.sort),
+				reddit.WithSubredditLimit(cfg.limit),
+			)
 		} else {
 			// Subsequent pages
 			posts, err = subreddit.GetPostsAfter(ctx, lastPost, cfg.limit)

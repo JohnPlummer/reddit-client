@@ -41,8 +41,11 @@ func main() {
 	// Create a subreddit instance
 	subreddit := reddit.NewSubreddit("golang", client)
 
-	// Get latest posts from r/golang
-	posts, err := subreddit.GetPosts(ctx, "new", 5)
+	// Get latest posts from r/golang using the new options pattern
+	posts, err := subreddit.GetPosts(ctx,
+		reddit.WithSort("new"),
+		reddit.WithSubredditLimit(5),
+	)
 	if err != nil {
 		log.Fatal("Error getting posts:", err)
 	}

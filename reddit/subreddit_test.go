@@ -180,15 +180,15 @@ var _ = Describe("Subreddit", func() {
 		})
 
 		It("fetches posts with the specified parameters", func() {
-			posts, err := subreddit.GetPosts(ctx, "new", 2)
+			posts, err := subreddit.GetPosts(ctx, reddit.WithSort("new"), reddit.WithSubredditLimit(2))
 			Expect(err).NotTo(HaveOccurred())
 			Expect(posts).To(HaveLen(2))
 			Expect(posts[0].Title).To(Equal("First Post"))
 			Expect(posts[1].Title).To(Equal("Second Post"))
 		})
 
-		It("respects the totalPosts limit", func() {
-			posts, err := subreddit.GetPosts(ctx, "new", 1)
+		It("respects the limit", func() {
+			posts, err := subreddit.GetPosts(ctx, reddit.WithSort("new"), reddit.WithSubredditLimit(1))
 			Expect(err).NotTo(HaveOccurred())
 			Expect(posts).To(HaveLen(1))
 			Expect(posts[0].Title).To(Equal("First Post"))
@@ -196,7 +196,7 @@ var _ = Describe("Subreddit", func() {
 
 		It("applies subreddit options", func() {
 			timestamp := time.Now().Unix()
-			posts, err := subreddit.GetPosts(ctx, "new", 1, reddit.Since(timestamp))
+			posts, err := subreddit.GetPosts(ctx, reddit.WithSort("new"), reddit.WithSubredditLimit(1), reddit.WithAfterTimestamp(timestamp))
 			Expect(err).NotTo(HaveOccurred())
 			Expect(posts).To(HaveLen(1))
 			Expect(posts[0].Title).To(Equal("First Post"))

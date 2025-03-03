@@ -2,7 +2,7 @@ package reddit
 
 import (
 	"context"
-	"fmt"
+	"strconv"
 )
 
 // PostGetter defines the interface for fetching posts from Reddit
@@ -16,9 +16,6 @@ type Subreddit struct {
 	client *Client
 }
 
-// SubredditOption is a function type for modifying subreddit request parameters
-type SubredditOption func(params map[string]string)
-
 // NewSubreddit creates a new Subreddit instance
 func NewSubreddit(name string, client *Client) *Subreddit {
 	return &Subreddit{
@@ -27,52 +24,38 @@ func NewSubreddit(name string, client *Client) *Subreddit {
 	}
 }
 
-// GetPosts fetches posts from the subreddit
-func (s *Subreddit) GetPosts(ctx context.Context, sort string, totalPosts int, opts ...SubredditOption) ([]Post, error) {
+// GetPosts fetches posts from the subreddit with optional pagination and filtering
+func (s *Subreddit) GetPosts(ctx context.Context, opts ...SubredditOption) ([]Post, error) {
 	params := map[string]string{
-		"limit": "100",
-		"sort":  sort,
+		"limit": "100", // Default limit
 	}
 
+	// Apply options
 	for _, opt := range opts {
 		opt(params)
 	}
 
-	var allPosts []Post
-	after := ""
+	// Convert params to PostOptions
+	var postOpts []PostOption
 
-	for len(allPosts) < totalPosts {
-		if after != "" {
-			params["after"] = after
+	// Handle limit
+	if limitStr, ok := params["limit"]; ok {
+		if limit, err := strconv.Atoi(limitStr); err == nil && limit > 0 {
+			postOpts = append(postOpts, WithLimit(limit))
 		}
-
-		posts, nextPage, err := s.client.getPosts(ctx, s.Name, params)
-		if err != nil {
-			return nil, err
-		}
-
-		allPosts = append(allPosts, posts...)
-		if nextPage == "" || len(posts) == 0 {
-			break
-		}
-		after = nextPage
 	}
 
-	if len(allPosts) > totalPosts {
-		allPosts = allPosts[:totalPosts]
+	// Handle after parameter
+	if after, ok := params["after"]; ok {
+		postOpts = append(postOpts, WithAfter(&Post{ID: after[3:]})) // Remove "t3_" prefix
 	}
 
-	return allPosts, nil
+	return s.client.getPosts(ctx, s.Name, postOpts...)
 }
 
-// GetPostsAfter fetches posts from the subreddit that come after the specified post
+// GetPostsAfter fetches posts from the subreddit that come after the specified post.
+// This method will automatically fetch multiple pages as needed up to the specified limit.
+// Set limit to 0 to fetch all available posts (use with caution).
 func (s *Subreddit) GetPostsAfter(ctx context.Context, after *Post, limit int) ([]Post, error) {
-	return s.client.getPostsAfter(ctx, s.Name, after, limit)
-}
-
-// Since returns a SubredditOption that filters posts created after the given timestamp
-func Since(timestamp int64) SubredditOption {
-	return func(params map[string]string) {
-		params["after"] = fmt.Sprintf("t3_%d", timestamp)
-	}
+	return s.client.getPosts(ctx, s.Name, WithAfter(after), WithLimit(limit))
 }
