@@ -1,4 +1,4 @@
-.PHONY: run-basic run-comprehensive run-examples test tidy tidy-examples tidy-all lint lint-examples lint-all check
+.PHONY: run-basic run-comprehensive run-examples test tidy tidy-examples tidy-all lint lint-examples lint-all check coverage
 
 # Run the basic example
 run-basic:
@@ -63,3 +63,15 @@ check:
 	@echo "Step 4: Running examples..."
 	@make run-examples
 	@echo "All checks completed successfully!"
+
+# Generate coverage report in markdown format
+coverage:
+	@echo "Generating coverage report..."
+	ginkgo -v --coverprofile=coverage.out ./...
+	@echo "# Coverage Report\n" > coverage.md
+	@echo "| Function | Coverage |" >> coverage.md
+	@echo "|----------|----------|" >> coverage.md
+	@go tool cover -func=coverage.out | grep -v "total:" | awk '{printf "| %s | %s |\n", $$1, $$3}' >> coverage.md
+	@echo "\n## Total Coverage" >> coverage.md
+	@go tool cover -func=coverage.out | grep "total:" | awk '{printf "**%s**\n", $$3}' >> coverage.md
+	@echo "Coverage report generated: coverage.md"

@@ -40,3 +40,8 @@ debug/
 # Example output files
 results.json
 examples/**/results.json
+
+# Coverage reports
+coverage.out
+coverage.md
+coverage.html
