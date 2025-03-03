@@ -183,6 +183,15 @@ if err == nil && len(firstPageComments) > 0 {
 
 // Get all available comments starting from the beginning
 allComments, err := post.GetCommentsAfter(ctx, nil, 0)
+
+// Using functional options for more control
+comments, err := post.GetComments(ctx,
+    WithCommentLimit(50),
+    WithCommentSort("top"),
+    WithCommentDepth(5),
+    WithCommentContext(3),
+    WithCommentShowMore(true),
+)
 ```
 
 ## License

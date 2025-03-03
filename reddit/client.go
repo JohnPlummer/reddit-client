@@ -63,7 +63,16 @@ func (c *Client) request(ctx context.Context, method, endpoint string) (*http.Re
 }
 
 // getComments is an internal method for fetching comments
-func (c *Client) getComments(ctx context.Context, subreddit, postID string, params map[string]string) ([]interface{}, error) {
+func (c *Client) getComments(ctx context.Context, subreddit, postID string, opts ...CommentOption) ([]interface{}, error) {
+	params := map[string]string{
+		"limit": "100", // Default limit
+	}
+
+	// Apply options
+	for _, opt := range opts {
+		opt(params)
+	}
+
 	endpoint := fmt.Sprintf("/r/%s/comments/%s", subreddit, postID)
 	if len(params) > 0 {
 		endpoint += "?"

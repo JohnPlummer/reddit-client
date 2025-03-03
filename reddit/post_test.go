@@ -15,9 +15,15 @@ type mockClient struct {
 	commentsErr   error
 }
 
-func (m *mockClient) getComments(ctx context.Context, subreddit, postID string, params map[string]string) ([]interface{}, error) {
+func (m *mockClient) getComments(ctx context.Context, subreddit, postID string, opts ...CommentOption) ([]interface{}, error) {
 	if m.commentsErr != nil {
 		return nil, m.commentsErr
+	}
+
+	// Convert options to params for testing
+	params := make(map[string]string)
+	for _, opt := range opts {
+		opt(params)
 	}
 
 	// If "after" parameter is present, return second page

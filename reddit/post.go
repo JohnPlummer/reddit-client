@@ -22,7 +22,7 @@ type Post struct {
 
 // commentGetter interface for fetching comments (private but useful for testing)
 type commentGetter interface {
-	getComments(ctx context.Context, subreddit, postID string, params map[string]string) ([]interface{}, error)
+	getComments(ctx context.Context, subreddit, postID string, opts ...CommentOption) ([]interface{}, error)
 }
 
 // String returns a formatted string representation of the Post
@@ -115,9 +115,6 @@ func parsePosts(data map[string]interface{}, client commentGetter) ([]Post, stri
 	return posts, nextPage, nil
 }
 
-// CommentOption is a function type for modifying comment request parameters
-type CommentOption func(params map[string]string)
-
 // CommentGetter interface for fetching comments
 type CommentGetter interface {
 	GetComments(ctx context.Context, subreddit, postID string, params map[string]string) ([]interface{}, error)
@@ -129,12 +126,7 @@ func (p *Post) GetComments(ctx context.Context, opts ...CommentOption) ([]Commen
 		return nil, fmt.Errorf("post has no associated client")
 	}
 
-	params := make(map[string]string)
-	for _, opt := range opts {
-		opt(params)
-	}
-
-	data, err := p.client.getComments(ctx, p.Subreddit, p.ID, params)
+	data, err := p.client.getComments(ctx, p.Subreddit, p.ID, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("fetching comments: %w", err)
 	}
@@ -149,14 +141,14 @@ func (p *Post) GetCommentsAfter(ctx context.Context, after *Comment, limit int) 
 		return nil, fmt.Errorf("post has no associated client")
 	}
 
-	params := map[string]string{"limit": "100"}
+	opts := []CommentOption{WithCommentLimit(100)}
 	if after != nil {
-		params["after"] = after.Fullname()
+		opts = append(opts, WithCommentAfter(after))
 	}
 
 	var allComments []Comment
 	for {
-		data, err := p.client.getComments(ctx, p.Subreddit, p.ID, params)
+		data, err := p.client.getComments(ctx, p.Subreddit, p.ID, opts...)
 		if err != nil {
 			return nil, fmt.Errorf("fetching comments after: %w", err)
 		}
@@ -181,7 +173,7 @@ func (p *Post) GetCommentsAfter(ctx context.Context, after *Comment, limit int) 
 
 		// Update the after parameter for the next request
 		lastComment := comments[len(comments)-1]
-		params["after"] = lastComment.Fullname()
+		opts = []CommentOption{WithCommentLimit(100), WithCommentAfter(&lastComment)}
 	}
 
 	return allComments, nil
