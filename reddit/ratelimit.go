@@ -2,6 +2,7 @@ package reddit
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -74,4 +75,22 @@ func (r *RateLimiter) UpdateLimit(remaining int, reset time.Time) {
 		burst = 1
 	}
 	r.limiter.SetBurst(burst)
+}
+
+// GetConfig returns the current rate limit configuration
+func (r *RateLimiter) GetConfig() (requestsPerMinute float64, burst int) {
+	if r.limiter == nil {
+		return 0, 0
+	}
+	// Convert requests per second back to requests per minute
+	return float64(r.limiter.Limit()) * 60, r.limiter.Burst()
+}
+
+// String returns a string representation of the RateLimiter
+func (r *RateLimiter) String() string {
+	if r == nil {
+		return "RateLimiter<nil>"
+	}
+	requestsPerMinute, burst := r.GetConfig()
+	return fmt.Sprintf("RateLimiter{requests_per_minute: %.1f, burst: %d}", requestsPerMinute, burst)
 }

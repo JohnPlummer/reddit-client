@@ -205,7 +205,7 @@ func (c *Client) String() string {
 		return "Client<nil>"
 	}
 
-	return fmt.Sprintf("Client{Auth: %v, UserAgent: %q, RateLimiter: %v}",
+	return fmt.Sprintf("Client{Auth: %v, UserAgent: %q, %v}",
 		c.Auth,
 		c.userAgent,
 		c.rateLimiter,

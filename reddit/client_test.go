@@ -35,6 +35,8 @@ var _ = Describe("Client", func() {
 			)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(client).NotTo(BeNil())
+			Expect(client.String()).To(ContainSubstring("UserAgent: \"golang:reddit-client:v1.0\""))
+			Expect(client.String()).To(ContainSubstring("RateLimiter{requests_per_minute: 60.0, burst: 5}"))
 		})
 
 		It("creates a client with multiple custom options", func() {
@@ -46,6 +48,8 @@ var _ = Describe("Client", func() {
 			)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(client).NotTo(BeNil())
+			Expect(client.String()).To(ContainSubstring("UserAgent: \"custom-agent\""))
+			Expect(client.String()).To(ContainSubstring("RateLimiter{requests_per_minute: 30.0, burst: 3}"))
 		})
 
 		It("creates a client with custom user agent", func() {
@@ -56,6 +60,7 @@ var _ = Describe("Client", func() {
 			)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(client).NotTo(BeNil())
+			Expect(client.String()).To(ContainSubstring("UserAgent: \"test-bot/1.0\""))
 		})
 
 		It("creates a client with custom rate limiting", func() {
@@ -66,6 +71,21 @@ var _ = Describe("Client", func() {
 			)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(client).NotTo(BeNil())
+
+			// Verify rate limiter configuration through String method
+			Expect(client.String()).To(ContainSubstring("RateLimiter{requests_per_minute: 45.0, burst: 4}"))
+		})
+
+		It("creates a client with default rate limiting", func() {
+			client, err := reddit.NewClient(
+				reddit.WithAuth(auth),
+				reddit.WithHTTPClient(mockClient),
+			)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(client).NotTo(BeNil())
+
+			// Verify default rate limiter configuration through String method
+			Expect(client.String()).To(ContainSubstring("RateLimiter{requests_per_minute: 60.0, burst: 5}"))
 		})
 
 		It("returns error with nil auth option", func() {
