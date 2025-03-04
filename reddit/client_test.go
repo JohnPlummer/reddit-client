@@ -27,8 +27,7 @@ var _ = Describe("Client", func() {
 
 	Describe("NewClient", func() {
 		It("creates a client with default options", func() {
-			client, err := reddit.NewClient(
-				reddit.WithAuth(auth),
+			client, err := reddit.NewClient(auth,
 				reddit.WithHTTPClient(mockClient),
 			)
 			Expect(err).NotTo(HaveOccurred())
@@ -38,8 +37,7 @@ var _ = Describe("Client", func() {
 		})
 
 		It("creates a client with multiple custom options", func() {
-			client, err := reddit.NewClient(
-				reddit.WithAuth(auth),
+			client, err := reddit.NewClient(auth,
 				reddit.WithHTTPClient(mockClient),
 				reddit.WithUserAgent("custom-agent"),
 				reddit.WithRateLimit(30, 3),
@@ -51,8 +49,7 @@ var _ = Describe("Client", func() {
 		})
 
 		It("creates a client with custom user agent", func() {
-			client, err := reddit.NewClient(
-				reddit.WithAuth(auth),
+			client, err := reddit.NewClient(auth,
 				reddit.WithHTTPClient(mockClient),
 				reddit.WithUserAgent("test-bot/1.0"),
 			)
@@ -62,8 +59,7 @@ var _ = Describe("Client", func() {
 		})
 
 		It("creates a client with custom rate limiting", func() {
-			client, err := reddit.NewClient(
-				reddit.WithAuth(auth),
+			client, err := reddit.NewClient(auth,
 				reddit.WithHTTPClient(mockClient),
 				reddit.WithRateLimit(45, 4),
 			)
@@ -75,8 +71,7 @@ var _ = Describe("Client", func() {
 		})
 
 		It("creates a client with default rate limiting", func() {
-			client, err := reddit.NewClient(
-				reddit.WithAuth(auth),
+			client, err := reddit.NewClient(auth,
 				reddit.WithHTTPClient(mockClient),
 			)
 			Expect(err).NotTo(HaveOccurred())
@@ -86,9 +81,9 @@ var _ = Describe("Client", func() {
 			Expect(client.String()).To(ContainSubstring("RateLimiter{requests_per_minute: 60.0, burst: 5}"))
 		})
 
-		It("returns error with nil auth option", func() {
-			client, err := reddit.NewClient()
-			Expect(err).To(MatchError("creating default auth client: missing credentials"))
+		It("returns error with nil auth", func() {
+			client, err := reddit.NewClient(nil)
+			Expect(err).To(MatchError("auth is required for client creation"))
 			Expect(client).To(BeNil())
 		})
 	})

@@ -167,9 +167,14 @@ func (c *Client) getPostsPage(ctx context.Context, subreddit string, params map[
 }
 
 // NewClient creates a new Reddit client with the provided options
-func NewClient(opts ...ClientOption) (*Client, error) {
+func NewClient(auth *Auth, opts ...ClientOption) (*Client, error) {
+	if auth == nil {
+		return nil, fmt.Errorf("auth is required for client creation")
+	}
+
 	// Start with default options
 	c := &Client{
+		Auth:        auth,
 		rateLimiter: NewRateLimiter(60, 5), // Default to 60 requests per minute with burst of 5
 		userAgent:   "golang:reddit-client:v1.0",
 		client:      &http.Client{}, // Default HTTP client
@@ -178,16 +183,6 @@ func NewClient(opts ...ClientOption) (*Client, error) {
 	// Apply options
 	for _, opt := range opts {
 		opt(c)
-	}
-
-	// Validate required configuration
-	if c.Auth == nil {
-		// Create default Auth if none provided
-		var err error
-		c.Auth, err = NewAuth("", "", WithAuthUserAgent(c.userAgent))
-		if err != nil {
-			return nil, fmt.Errorf("creating default auth client: %w", err)
-		}
 	}
 
 	if c.client == nil {

@@ -93,8 +93,7 @@ func main() {
 	}
 
 	// Create a new client
-	client, err := reddit.NewClient(
-		reddit.WithAuth(auth),
+	client, err := reddit.NewClient(auth,
 		reddit.WithUserAgent("MyRedditBot/1.0"),
 		reddit.WithRateLimit(cfg.rateLimit, cfg.rateBurst),
 	)

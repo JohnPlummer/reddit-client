@@ -2,8 +2,8 @@ package reddit_test
 
 import (
 	"context"
-	"time"
 	"net/http"
+	"time"
 
 	"github.com/JohnPlummer/reddit-client/reddit"
 	. "github.com/onsi/ginkgo/v2"
@@ -29,8 +29,7 @@ var _ = Describe("Subreddit", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		// Create client with auth and custom transport
-		client, err = reddit.NewClient(
-			reddit.WithAuth(auth),
+		client, err = reddit.NewClient(auth,
 			reddit.WithHTTPClient(mockClient),
 			reddit.WithUserAgent("test-bot/1.0"),
 		)

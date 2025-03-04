@@ -42,13 +42,6 @@ func WithHTTPClient(client *http.Client) ClientOption {
 	}
 }
 
-// WithAuth sets the Auth client
-func WithAuth(auth *Auth) ClientOption {
-	return func(c *Client) {
-		c.Auth = auth
-	}
-}
-
 // PostOption is a function type for modifying post request parameters
 type PostOption func(params map[string]string)
 

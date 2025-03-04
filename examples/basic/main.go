@@ -31,9 +31,7 @@ func main() {
 	}
 
 	// Create a new client with default options
-	client, err := reddit.NewClient(
-		reddit.WithAuth(auth),
-	)
+	client, err := reddit.NewClient(auth)
 	if err != nil {
 		log.Fatal("Failed to create client:", err)
 	}

@@ -8,7 +8,7 @@ import "context"
 type TestCommentGetter interface {
 	// This interface should define the methods that tests need to configure the mock
 	SetupComments(comments []interface{})
-	SetupCommentsAfter(comments []Comment) 
+	SetupCommentsAfter(comments []Comment)
 	SetupError(err error)
 }
 
