@@ -7,6 +7,8 @@ import (
 )
 
 // PostGetter defines the interface for fetching posts from Reddit
+//
+//go:generate mockgen -destination=mocks/subreddit_mocks.go -package=mocks github.com/JohnPlummer/reddit-client/reddit PostGetter
 type PostGetter interface {
 	GetPosts(subreddit string, params map[string]string) ([]Post, string, error)
 }

@@ -1,4 +1,4 @@
-.PHONY: run-basic run-comprehensive run-examples test tidy tidy-examples tidy-all lint lint-examples lint-all check coverage
+.PHONY: run-basic run-comprehensive run-examples test tidy tidy-examples tidy-all lint lint-examples lint-all check coverage install-mockgen generate-mocks
 
 # Run the basic example
 run-basic:
@@ -75,3 +75,12 @@ coverage:
 	@echo "\n## Total Coverage" >> coverage.md
 	@go tool cover -func=coverage.out | grep "total:" | awk '{printf "**%s**\n", $$3}' >> coverage.md
 	@echo "Coverage report generated: coverage.md"
+
+# Install mockgen if not already installed
+install-mockgen:
+	@command -v mockgen >/dev/null 2>&1 || (echo "Installing mockgen..." && go install github.com/golang/mock/mockgen@v1.6.0)
+
+# Generate mocks
+generate-mocks: install-mockgen
+	@echo "Generating mocks..."
+	@go generate ./...

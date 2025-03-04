@@ -21,6 +21,8 @@ type Post struct {
 }
 
 // commentGetter interface for fetching comments (private but useful for testing)
+//
+//go:generate mockgen -source=post.go -destination=mocks/post_mocks.go -package=mocks
 type commentGetter interface {
 	getComments(ctx context.Context, subreddit, postID string, opts ...CommentOption) ([]interface{}, error)
 }
@@ -116,6 +118,8 @@ func parsePosts(data map[string]interface{}, client commentGetter) ([]Post, stri
 }
 
 // CommentGetter interface for fetching comments
+//
+//go:generate mockgen -source=post.go -destination=mocks/post_mocks.go -package=mocks
 type CommentGetter interface {
 	GetComments(ctx context.Context, subreddit, postID string, params map[string]string) ([]interface{}, error)
 }
