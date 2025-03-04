@@ -1,122 +1,43 @@
-package reddit
+package reddit_test
 
 import (
 	"context"
 	"errors"
 
+	"github.com/JohnPlummer/reddit-client/reddit"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
-// mockClient implements just the methods needed for Post tests
-type mockClient struct {
-	comments      []interface{}
-	commentsAfter []Comment
-	commentsErr   error
-}
-
-func (m *mockClient) getComments(ctx context.Context, subreddit, postID string, opts ...CommentOption) ([]interface{}, error) {
-	if m.commentsErr != nil {
-		return nil, m.commentsErr
-	}
-
-	// Convert options to params for testing
-	params := make(map[string]string)
-	for _, opt := range opts {
-		opt(params)
-	}
-
-	// If "after" parameter is present, return second page
-	if after, ok := params["after"]; ok && after == "t1_c1" {
-		return []interface{}{
-			map[string]interface{}{}, // First element (post data)
-			map[string]interface{}{ // Second element (comments data)
-				"data": map[string]interface{}{
-					"children": []interface{}{
-						map[string]interface{}{
-							"data": map[string]interface{}{
-								"id":     "c2",
-								"author": "user2",
-								"body":   "comment2",
-							},
-						},
-					},
-				},
-			},
-		}, nil
-	}
-
-	// Return first page by default
-	if m.comments == nil {
-		return []interface{}{
-			map[string]interface{}{}, // First element (post data)
-			map[string]interface{}{ // Second element (comments data)
-				"data": map[string]interface{}{
-					"children": []interface{}{},
-				},
-			},
-		}, nil
-	}
-	return m.comments, nil
-}
-
-func (m *mockClient) getCommentsAfter(ctx context.Context, subreddit string, postID string, after *Comment, limit int) ([]Comment, error) {
-	if m.commentsErr != nil {
-		return nil, m.commentsErr
-	}
-	return m.commentsAfter, nil
-}
-
 var _ = Describe("Post", func() {
 	Describe("Fullname", func() {
 		It("returns the correct Reddit fullname format", func() {
-			post := Post{ID: "abc123"}
+			post := reddit.Post{ID: "abc123"}
 			Expect(post.Fullname()).To(Equal("t3_abc123"))
 		})
 
 		It("handles empty ID", func() {
-			post := Post{}
+			post := reddit.Post{}
 			Expect(post.Fullname()).To(Equal("t3_"))
 		})
 	})
 
 	Describe("GetComments", func() {
 		var (
-			client *mockClient
-			post   *Post
-			ctx    context.Context
+			post     *reddit.Post
+			testMock reddit.TestCommentGetter // Exposing just an interface-typed reference
+			ctx      context.Context
 		)
 
 		BeforeEach(func() {
-			client = &mockClient{}
-			post = &Post{ID: "123", Title: "Test Post", Subreddit: "golang", client: client}
+			// Use the test helper in the reddit package
+			post, testMock = reddit.NewTestPost("123", "Test Post", "golang")
 			ctx = context.Background()
 		})
 
 		It("fetches comments for a post", func() {
-			client.comments = []interface{}{
-				map[string]interface{}{}, // First element (post data)
-				map[string]interface{}{ // Second element (comments data)
-					"data": map[string]interface{}{
-						"children": []interface{}{
-							map[string]interface{}{
-								"data": map[string]interface{}{
-									"id":     "c1",
-									"author": "user1",
-									"body":   "comment1",
-								},
-							},
-							map[string]interface{}{
-								"data": map[string]interface{}{
-									"id":     "c2",
-									"author": "user2",
-									"body":   "comment2",
-								},
-							},
-						},
-					},
-				},
-			}
+			// Configure the mock directly through interface
+			testMock.SetupComments(reddit.SetupTestCommentsData())
 
 			comments, err := post.GetComments(ctx)
 			Expect(err).NotTo(HaveOccurred())
@@ -128,7 +49,7 @@ var _ = Describe("Post", func() {
 
 		It("handles errors when fetching comments", func() {
 			expectedErr := errors.New("API error")
-			client.commentsErr = expectedErr
+			testMock.SetupError(expectedErr)
 
 			comments, err := post.GetComments(ctx)
 			Expect(err).To(MatchError("fetching comments: API error"))
@@ -137,8 +58,8 @@ var _ = Describe("Post", func() {
 		})
 
 		It("fetches comments after a specific comment", func() {
-			// First page setup
-			client.comments = []interface{}{
+			// First page setup - single comment
+			commentsData := []interface{}{
 				map[string]interface{}{}, // First element (post data)
 				map[string]interface{}{ // Second element (comments data)
 					"data": map[string]interface{}{
@@ -154,6 +75,7 @@ var _ = Describe("Post", func() {
 					},
 				},
 			}
+			testMock.SetupComments(commentsData)
 
 			// Get first page of comments
 			comments, err := post.GetComments(ctx)
@@ -173,9 +95,9 @@ var _ = Describe("Post", func() {
 		})
 
 		It("handles errors when fetching comments after", func() {
-			firstComment := Comment{ID: "c1"}
+			firstComment := reddit.Comment{ID: "c1"}
 			expectedErr := errors.New("API error")
-			client.commentsErr = expectedErr
+			testMock.SetupError(expectedErr)
 
 			moreComments, err := post.GetCommentsAfter(ctx, &firstComment, 1)
 			Expect(err).To(MatchError("fetching comments after: API error"))
@@ -186,12 +108,12 @@ var _ = Describe("Post", func() {
 
 	Describe("Comment", func() {
 		It("returns the correct fullname format", func() {
-			comment := Comment{ID: "abc123"}
+			comment := reddit.Comment{ID: "abc123"}
 			Expect(comment.Fullname()).To(Equal("t1_abc123"))
 		})
 
 		It("handles empty ID", func() {
-			comment := Comment{}
+			comment := reddit.Comment{}
 			Expect(comment.Fullname()).To(Equal("t1_"))
 		})
 	})

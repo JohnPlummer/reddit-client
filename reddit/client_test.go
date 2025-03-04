@@ -10,15 +10,13 @@ import (
 
 var _ = Describe("Client", func() {
 	var (
-		transport  *mockTransport
+		transport  *reddit.TestTransport
 		auth       *reddit.Auth
 		mockClient *http.Client
 	)
 
 	BeforeEach(func() {
-		transport = &mockTransport{
-			responses: make(map[string]*http.Response),
-		}
+		transport = reddit.NewTestTransport()
 		mockClient = &http.Client{Transport: transport}
 
 		var err error
