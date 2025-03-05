@@ -218,7 +218,7 @@ func parseFlags() *Config {
 	flag.StringVar(&cfg.timeframe, "timeframe", "all", "Timeframe for top posts (hour, day, week, month, year, all)")
 	flag.IntVar(&cfg.maxPages, "max-pages", 1, "Maximum number of pages to fetch")
 	flag.StringVar(&cfg.logLevel, "log-level", "info", "Log level (debug, info, warn, error)")
-	flag.IntVar(&cfg.rateLimit, "rate-limit", 1, "Rate limit in requests per second")
+	flag.IntVar(&cfg.rateLimit, "rate-limit", 60, "Rate limit in requests per minute")
 	flag.IntVar(&cfg.rateBurst, "rate-burst", 5, "Maximum burst size for rate limiting")
 	flag.DurationVar(&cfg.readTimeout, "timeout", 30*time.Second, "Read timeout duration")
 	flag.StringVar(&cfg.outputFile, "output", "", "Output file path (JSON format)")

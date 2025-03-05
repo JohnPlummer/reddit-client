@@ -36,7 +36,7 @@ go run main.go
 - `-timeframe string`: Timeframe for top posts (hour, day, week, month, year, all) (default "all")
 - `-max-pages int`: Maximum number of pages to fetch (default 1)
 - `-log-level string`: Log level (debug, info, warn, error) (default "info")
-- `-rate-limit int`: Rate limit in requests per second (default 1)
+- `-rate-limit int`: Rate limit in requests per minute (default 60)
 - `-rate-burst int`: Maximum burst size for rate limiting (default 5)
 - `-timeout duration`: Read timeout duration (default 30s)
 
