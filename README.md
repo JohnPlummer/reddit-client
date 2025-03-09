@@ -59,11 +59,14 @@ func main() {
         log.Fatal("Failed to create client:", err)
     }
 
-    // Get posts from a subreddit
-    posts, after, err := client.GetPosts(ctx, "golang", map[string]string{
-        "limit": "10",
-        "sort":  "new",
-    })
+    // Create a subreddit instance
+    subreddit := reddit.NewSubreddit("golang", client)
+
+    // Get posts from a subreddit using functional options
+    posts, err := subreddit.GetPosts(ctx, 
+        reddit.WithSort("new"),
+        reddit.WithSubredditLimit(10),
+    )
     if err != nil {
         log.Fatal("Error getting posts:", err)
     }
@@ -76,9 +79,9 @@ func main() {
         fmt.Println("---------------------------")
     }
 
-    // Get more posts using the after cursor
-    if after != "" {
-        morePosts, err := client.GetPostsAfter(ctx, "golang", &posts[len(posts)-1], 10)
+    // Get more posts using GetPostsAfter
+    if len(posts) > 0 {
+        morePosts, err := subreddit.GetPostsAfter(ctx, &posts[len(posts)-1], 10)
         if err != nil {
             log.Fatal("Error getting more posts:", err)
         }
@@ -134,64 +137,83 @@ reddit.WithTimeout(10 * time.Second)
 
 ## API Methods
 
-### GetPosts
+### Subreddit
 
-Fetches a single page of posts from a subreddit. Returns posts and a cursor for pagination.
+#### Creating a Subreddit
 
 ```go
-posts, after, err := client.GetPosts(ctx, "golang", map[string]string{
-    "limit": "25",  // Number of posts to fetch (max 100)
-    "sort": "new",  // Sort order (new, hot, top, etc.)
-})
+// Create a subreddit instance using the client
+subreddit := reddit.NewSubreddit("golang", client)
 ```
 
-### GetPostsAfter
+#### GetPosts
 
-Fetches multiple pages of posts after a specific post. Useful for implementing infinite scroll or pagination.
+Fetches posts from a subreddit with optional functional options.
+
+```go
+// Get posts from a subreddit using functional options
+posts, err := subreddit.GetPosts(ctx, 
+    reddit.WithSort("new"),
+    reddit.WithSubredditLimit(10),
+)
+```
+
+#### GetPostsAfter
+
+Fetches posts that come after a specific post. Useful for implementing pagination.
 
 ```go
 // Get posts after a specific post
 lastPost := &Post{ID: "abc123"}
-posts, err := client.GetPostsAfter(ctx, "golang", lastPost, 25)
+posts, err := subreddit.GetPostsAfter(ctx, lastPost, 25)
 
 // Or continue from previous GetPosts results
-firstPagePosts, after, _ := client.GetPosts(ctx, "golang", nil)
-if len(firstPagePosts) > 0 {
-    nextPosts, err := client.GetPostsAfter(ctx, "golang", &firstPagePosts[len(firstPagePosts)-1], 25)
+firstPagePosts, err := subreddit.GetPosts(ctx)
+if err == nil && len(firstPagePosts) > 0 {
+    nextPosts, err := subreddit.GetPostsAfter(ctx, &firstPagePosts[len(firstPagePosts)-1], 25)
 }
 
 // Get all available posts (use with caution)
-allPosts, err := client.GetPostsAfter(ctx, "golang", nil, 0)
+allPosts, err := subreddit.GetPostsAfter(ctx, nil, 0)
 ```
 
-### GetComments
+### Post
 
-Fetches comments for a post.
+#### GetComments
+
+Fetches comments for a post using functional options.
 
 ```go
-// Get all comments for a post
+// Get comments for a post
 post := &Post{ID: "abc123", Subreddit: "golang"}
 comments, err := post.GetComments(ctx)
 
-// With pagination using GetCommentsAfter
+// Using functional options for more control
+comments, err := post.GetComments(ctx,
+    reddit.WithCommentLimit(50),
+    reddit.WithCommentSort("top"),
+    reddit.WithCommentDepth(5),
+    reddit.WithCommentContext(3),
+    reddit.WithCommentShowMore(true),
+)
+```
+
+#### GetCommentsAfter
+
+Fetches comments that come after a specific comment. Useful for implementing pagination.
+
+```go
+// Get next page of comments after the last comment
 firstPageComments, err := post.GetComments(ctx)
 if err == nil && len(firstPageComments) > 0 {
-    // Get next page of comments after the last comment
-    comment := firstPageComments[len(firstPageComments)-1]  // Get the last comment
-    moreComments, err := post.GetCommentsAfter(ctx, &comment, 25)  // Pass its address
+    // Get the last comment
+    lastComment := firstPageComments[len(firstPageComments)-1] 
+    // Pass its address to GetCommentsAfter
+    moreComments, err := post.GetCommentsAfter(ctx, &lastComment, 25)
 }
 
 // Get all available comments starting from the beginning
 allComments, err := post.GetCommentsAfter(ctx, nil, 0)
-
-// Using functional options for more control
-comments, err := post.GetComments(ctx,
-    WithCommentLimit(50),
-    WithCommentSort("top"),
-    WithCommentDepth(5),
-    WithCommentContext(3),
-    WithCommentShowMore(true),
-)
 ```
 
 ## License
