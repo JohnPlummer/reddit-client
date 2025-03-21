@@ -24,7 +24,7 @@ type Post struct {
 //
 //go:generate mockgen -source=post.go -destination=mocks/comment_getter_mock.go -package=mocks
 type commentGetter interface {
-	getComments(ctx context.Context, subreddit, postID string, opts ...CommentOption) ([]interface{}, error)
+	getComments(ctx context.Context, subreddit, postID string, opts ...CommentOption) ([]any, error)
 }
 
 // String returns a formatted string representation of the Post
@@ -56,13 +56,13 @@ func (p Post) String() string {
 }
 
 // parsePost extracts a single post from the API response.
-func parsePost(item interface{}, client commentGetter) (Post, error) {
-	postMap, ok := item.(map[string]interface{})
+func parsePost(item any, client commentGetter) (Post, error) {
+	postMap, ok := item.(map[string]any)
 	if !ok {
 		return Post{}, fmt.Errorf("invalid post format")
 	}
 
-	data, ok := postMap["data"].(map[string]interface{})
+	data, ok := postMap["data"].(map[string]any)
 	if !ok {
 		return Post{}, fmt.Errorf("invalid post data format")
 	}
@@ -92,15 +92,15 @@ func parsePost(item interface{}, client commentGetter) (Post, error) {
 }
 
 // parsePosts extracts posts and the pagination cursor from API response.
-func parsePosts(data map[string]interface{}, client commentGetter) ([]Post, string, error) {
+func parsePosts(data map[string]any, client commentGetter) ([]Post, string, error) {
 	var posts []Post
 
-	listing, ok := data["data"].(map[string]interface{})
+	listing, ok := data["data"].(map[string]any)
 	if !ok {
 		return nil, "", fmt.Errorf("invalid response format: missing data object")
 	}
 
-	children, ok := listing["children"].([]interface{})
+	children, ok := listing["children"].([]any)
 	if !ok {
 		return nil, "", fmt.Errorf("invalid response format: missing children array")
 	}

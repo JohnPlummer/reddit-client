@@ -59,13 +59,13 @@ var _ = Describe("Post", func() {
 
 		It("fetches comments after a specific comment", func() {
 			// First page setup - single comment
-			commentsData := []interface{}{
-				map[string]interface{}{}, // First element (post data)
-				map[string]interface{}{ // Second element (comments data)
-					"data": map[string]interface{}{
-						"children": []interface{}{
-							map[string]interface{}{
-								"data": map[string]interface{}{
+			commentsData := []any{
+				map[string]any{}, // First element (post data)
+				map[string]any{ // Second element (comments data)
+					"data": map[string]any{
+						"children": []any{
+							map[string]any{
+								"data": map[string]any{
 									"id":     "c1",
 									"author": "user1",
 									"body":   "comment1",

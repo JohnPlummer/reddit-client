@@ -39,11 +39,11 @@ var _ = Describe("Subreddit", func() {
 		ctx = context.Background()
 
 		// Set up default post response
-		transport.AddResponse("/r/golang.json", reddit.CreateJSONResponse(map[string]interface{}{
-			"data": map[string]interface{}{
-				"children": []interface{}{
-					map[string]interface{}{
-						"data": map[string]interface{}{
+		transport.AddResponse("/r/golang.json", reddit.CreateJSONResponse(map[string]any{
+			"data": map[string]any{
+				"children": []any{
+					map[string]any{
+						"data": map[string]any{
 							"title":        "First Post",
 							"selftext":     "Content 1",
 							"url":          "https://example.com/1",
@@ -54,8 +54,8 @@ var _ = Describe("Subreddit", func() {
 							"num_comments": float64(10),
 						},
 					},
-					map[string]interface{}{
-						"data": map[string]interface{}{
+					map[string]any{
+						"data": map[string]any{
 							"title":        "Second Post",
 							"selftext":     "Content 2",
 							"url":          "https://example.com/2",
@@ -83,11 +83,11 @@ var _ = Describe("Subreddit", func() {
 	Describe("GetPosts", func() {
 		BeforeEach(func() {
 			// Mock response for /r/golang.json
-			transport.AddResponse("/r/golang.json", reddit.CreateJSONResponse(map[string]interface{}{
-				"data": map[string]interface{}{
-					"children": []interface{}{
-						map[string]interface{}{
-							"data": map[string]interface{}{
+			transport.AddResponse("/r/golang.json", reddit.CreateJSONResponse(map[string]any{
+				"data": map[string]any{
+					"children": []any{
+						map[string]any{
+							"data": map[string]any{
 								"title":        "First Post",
 								"selftext":     "Content 1",
 								"url":          "https://example.com/1",
@@ -98,8 +98,8 @@ var _ = Describe("Subreddit", func() {
 								"num_comments": float64(10),
 							},
 						},
-						map[string]interface{}{
-							"data": map[string]interface{}{
+						map[string]any{
+							"data": map[string]any{
 								"title":        "Second Post",
 								"selftext":     "Content 2",
 								"url":          "https://example.com/2",
@@ -143,11 +143,11 @@ var _ = Describe("Subreddit", func() {
 	Describe("GetPostsAfter", func() {
 		BeforeEach(func() {
 			// Mock response for /r/golang.json?after=t3_post1
-			transport.AddResponse("/r/golang.json", reddit.CreateJSONResponse(map[string]interface{}{
-				"data": map[string]interface{}{
-					"children": []interface{}{
-						map[string]interface{}{
-							"data": map[string]interface{}{
+			transport.AddResponse("/r/golang.json", reddit.CreateJSONResponse(map[string]any{
+				"data": map[string]any{
+					"children": []any{
+						map[string]any{
+							"data": map[string]any{
 								"title":        "Second Post",
 								"selftext":     "Content 2",
 								"url":          "https://example.com/2",
@@ -158,8 +158,8 @@ var _ = Describe("Subreddit", func() {
 								"num_comments": float64(20),
 							},
 						},
-						map[string]interface{}{
-							"data": map[string]interface{}{
+						map[string]any{
+							"data": map[string]any{
 								"title":        "Third Post",
 								"selftext":     "Content 3",
 								"url":          "https://example.com/3",
@@ -191,9 +191,9 @@ var _ = Describe("Subreddit", func() {
 			mockClient.Transport = transport
 
 			// Set up response with empty page but with after token
-			transport.AddResponse("/r/golang.json", reddit.CreateJSONResponse(map[string]interface{}{
-				"data": map[string]interface{}{
-					"children": []interface{}{},
+			transport.AddResponse("/r/golang.json", reddit.CreateJSONResponse(map[string]any{
+				"data": map[string]any{
+					"children": []any{},
 					"after":    "t3_post5",
 				},
 			}))

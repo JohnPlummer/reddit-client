@@ -36,14 +36,14 @@ func (m *MockcommentGetter) EXPECT() *MockcommentGetterMockRecorder {
 }
 
 // getComments mocks base method.
-func (m *MockcommentGetter) getComments(ctx context.Context, subreddit, postID string, opts ...reddit.CommentOption) ([]interface{}, error) {
+func (m *MockcommentGetter) getComments(ctx context.Context, subreddit, postID string, opts ...reddit.CommentOption) ([]any, error) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{ctx, subreddit, postID}
 	for _, a := range opts {
 		varargs = append(varargs, a)
 	}
 	ret := m.ctrl.Call(m, "getComments", varargs...)
-	ret0, _ := ret[0].([]interface{})
+	ret0, _ := ret[0].([]any)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

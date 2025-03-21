@@ -20,22 +20,22 @@ func (c Comment) Fullname() string {
 }
 
 // parseComments extracts comments from the API response
-func parseComments(data []interface{}) ([]Comment, error) {
+func parseComments(data []any) ([]Comment, error) {
 	if len(data) < 2 {
 		return nil, fmt.Errorf("unexpected response format")
 	}
 
-	commentData, ok := data[1].(map[string]interface{})
+	commentData, ok := data[1].(map[string]any)
 	if !ok {
 		return nil, fmt.Errorf("unexpected response format")
 	}
 
 	var comments []Comment
-	children := commentData["data"].(map[string]interface{})["children"].([]interface{})
+	children := commentData["data"].(map[string]any)["children"].([]any)
 	now := nowUnix()
 
 	for _, item := range children {
-		commentBody := item.(map[string]interface{})["data"].(map[string]interface{})
+		commentBody := item.(map[string]any)["data"].(map[string]any)
 		created, _ := commentBody["created_utc"].(float64)
 		comments = append(comments, Comment{
 			Author:     commentBody["author"].(string),

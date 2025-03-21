@@ -82,7 +82,7 @@ func (m *TestTransport) SetError(err error) {
 }
 
 // CreateJSONResponse creates an HTTP response with JSON body
-func CreateJSONResponse(data interface{}) *http.Response {
+func CreateJSONResponse(data any) *http.Response {
 	body, err := json.Marshal(data)
 	if err != nil {
 		panic(err)

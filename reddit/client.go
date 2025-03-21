@@ -63,7 +63,7 @@ func (c *Client) request(ctx context.Context, method, endpoint string) (*http.Re
 }
 
 // getComments is an internal method for fetching comments
-func (c *Client) getComments(ctx context.Context, subreddit, postID string, opts ...CommentOption) ([]interface{}, error) {
+func (c *Client) getComments(ctx context.Context, subreddit, postID string, opts ...CommentOption) ([]any, error) {
 	params := map[string]string{
 		"limit": "100", // Default limit
 	}
@@ -88,7 +88,7 @@ func (c *Client) getComments(ctx context.Context, subreddit, postID string, opts
 	}
 	defer resp.Body.Close()
 
-	var data []interface{}
+	var data []any
 	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
 		return nil, fmt.Errorf("decoding response: %w", err)
 	}
@@ -158,7 +158,7 @@ func (c *Client) getPostsPage(ctx context.Context, subreddit string, params map[
 	}
 	defer resp.Body.Close()
 
-	var data map[string]interface{}
+	var data map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
 		return nil, "", fmt.Errorf("decoding response: %w", err)
 	}
