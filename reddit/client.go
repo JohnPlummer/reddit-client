@@ -129,8 +129,8 @@ func (c *Client) getPosts(ctx context.Context, subreddit string, opts ...PostOpt
 			break
 		}
 
-		// Stop if there are no more pages
-		if nextAfter == "" {
+		// Stop if there are no more pages or if we got no posts in this page
+		if nextAfter == "" || len(posts) == 0 {
 			break
 		}
 

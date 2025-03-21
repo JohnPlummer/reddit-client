@@ -148,6 +148,18 @@ var _ = Describe("Subreddit", func() {
 					"children": []interface{}{
 						map[string]interface{}{
 							"data": map[string]interface{}{
+								"title":        "Second Post",
+								"selftext":     "Content 2",
+								"url":          "https://example.com/2",
+								"created_utc":  float64(time.Now().Unix()),
+								"subreddit":    "golang",
+								"id":           "post2",
+								"score":        float64(200),
+								"num_comments": float64(20),
+							},
+						},
+						map[string]interface{}{
+							"data": map[string]interface{}{
 								"title":        "Third Post",
 								"selftext":     "Content 3",
 								"url":          "https://example.com/3",
@@ -168,8 +180,28 @@ var _ = Describe("Subreddit", func() {
 			afterPost := &reddit.Post{ID: "post1"}
 			posts, err := subreddit.GetPostsAfter(ctx, afterPost, 2)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(posts).To(HaveLen(1))
-			Expect(posts[0].Title).To(Equal("Third Post"))
+			Expect(posts).To(HaveLen(2))
+			Expect(posts[0].Title).To(Equal("Second Post"))
+			Expect(posts[1].Title).To(Equal("Third Post"))
+		})
+
+		It("stops fetching when a page has no posts", func() {
+			// Clear existing responses
+			transport = reddit.NewTestTransport()
+			mockClient.Transport = transport
+
+			// Set up response with empty page but with after token
+			transport.AddResponse("/r/golang.json", reddit.CreateJSONResponse(map[string]interface{}{
+				"data": map[string]interface{}{
+					"children": []interface{}{},
+					"after":    "t3_post5",
+				},
+			}))
+
+			afterPost := &reddit.Post{ID: "post1"}
+			posts, err := subreddit.GetPostsAfter(ctx, afterPost, 10)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(posts).To(HaveLen(0))
 		})
 	})
 })
