@@ -45,3 +45,4 @@ examples/**/results.json
 coverage.out
 coverage.md
 coverage.html
+.claude/settings.local.json
