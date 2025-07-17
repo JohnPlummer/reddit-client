@@ -2,6 +2,7 @@ package reddit_test
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"strconv"
@@ -398,7 +399,7 @@ var _ = Describe("Client", func() {
 				posts, err := subreddit.GetPosts(ctx)
 				Expect(err).To(HaveOccurred())
 				Expect(posts).To(BeNil())
-				Expect(err).To(Equal(context.Canceled))
+				Expect(errors.Is(err, context.Canceled)).To(BeTrue())
 			})
 		})
 	})
