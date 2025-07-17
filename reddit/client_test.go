@@ -380,18 +380,6 @@ var _ = Describe("Client", func() {
 			})
 		})
 
-		Context("with network errors", func() {
-			It("retries on network errors and succeeds", func() {
-				// Since network errors affect the whole client, let's test it differently
-				// We'll skip these tests as they are more complex to implement properly
-				// in the test environment and the core retry logic is tested above
-				Skip("Network error testing requires complex mock setup - core retry logic tested in other tests")
-			})
-
-			It("exhausts retries on persistent network errors", func() {
-				Skip("Network error testing requires complex mock setup - core retry logic tested in other tests")
-			})
-		})
 
 		Context("with context cancellation", func() {
 			It("respects context cancellation during retry delay", func() {
