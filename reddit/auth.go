@@ -35,6 +35,41 @@ type Auth struct {
 	timeout      time.Duration
 }
 
+// requestJSON performs an HTTP request and decodes the JSON response into the provided result
+func (a *Auth) requestJSON(ctx context.Context, method, url, contentType string, body io.Reader, result any) error {
+	req, err := http.NewRequestWithContext(ctx, method, url, body)
+	if err != nil {
+		return fmt.Errorf("auth.requestJSON: creating request failed: %w", err)
+	}
+
+	req.SetBasicAuth(a.ClientID, a.ClientSecret)
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
+	}
+	req.Header.Set("User-Agent", a.userAgent)
+
+	resp, err := a.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("auth.requestJSON: making request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("auth.requestJSON: reading response body failed: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return NewAPIError(resp, respBody)
+	}
+
+	if err := json.Unmarshal(respBody, result); err != nil {
+		return fmt.Errorf("auth.requestJSON: parsing JSON response failed for %s %s: %w", method, url, err)
+	}
+
+	return nil
+}
+
 // IsTokenExpired checks if the current token is expired or about to expire
 func (a *Auth) IsTokenExpired() bool {
 	return time.Now().Add(time.Minute).After(a.ExpiresAt)
@@ -47,34 +82,10 @@ func (a *Auth) Authenticate(ctx context.Context) error {
 	data := url.Values{}
 	data.Set("grant_type", "client_credentials")
 
-	req, err := http.NewRequestWithContext(ctx, "POST", tokenURL, strings.NewReader(data.Encode()))
-	if err != nil {
-		slog.ErrorContext(ctx, "failed to create auth request", "error", err)
-		return fmt.Errorf("auth.Authenticate: creating request failed: %w", err)
-	}
-
-	req.SetBasicAuth(a.ClientID, a.ClientSecret)
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("User-Agent", a.userAgent)
-
-	resp, err := a.client.Do(req)
-	if err != nil {
-		return fmt.Errorf("auth.Authenticate: making request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("auth.Authenticate: reading response body failed: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return NewAPIError(resp, body)
-	}
-
 	var tokenResp TokenResponse
-	if err := json.Unmarshal(body, &tokenResp); err != nil {
-		return fmt.Errorf("auth.Authenticate: parsing token response failed: %w", err)
+	if err := a.requestJSON(ctx, "POST", tokenURL, "application/x-www-form-urlencoded", strings.NewReader(data.Encode()), &tokenResp); err != nil {
+		slog.ErrorContext(ctx, "failed to authenticate with Reddit", "error", err)
+		return fmt.Errorf("auth.Authenticate: %w", err)
 	}
 
 	if tokenResp.AccessToken == "" {

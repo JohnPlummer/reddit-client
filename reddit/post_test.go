@@ -100,7 +100,7 @@ var _ = Describe("Post", func() {
 			testMock.SetupError(expectedErr)
 
 			moreComments, err := post.GetCommentsAfter(ctx, &firstComment, 1)
-			Expect(err).To(MatchError("post.GetCommentsAfter: fetching comments failed: API error"))
+			Expect(err).To(MatchError("pagination.PaginateAll: fetch page failed (after=\"\"): fetching comments failed: API error"))
 			Expect(errors.Is(err, expectedErr)).To(BeTrue())
 			Expect(moreComments).To(BeNil())
 		})

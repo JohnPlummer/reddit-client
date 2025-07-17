@@ -100,6 +100,85 @@ func parseRetryAfter(retryAfterHeader string) time.Duration {
 	return 0
 }
 
+// updateRateLimitFromHeaders extracts rate limit information from response headers and updates the rate limiter
+func (c *Client) updateRateLimitFromHeaders(headers http.Header, endpoint string) {
+	remainingStr := headers.Get("X-Ratelimit-Remaining")
+	usedStr := headers.Get("X-Ratelimit-Used")
+	resetStr := headers.Get("X-Ratelimit-Reset")
+
+	// If no rate limit headers are present, skip update
+	if remainingStr == "" && usedStr == "" && resetStr == "" {
+		return
+	}
+
+	var remaining, used int
+	var reset time.Time
+	var hasValidData bool
+
+	// Parse remaining requests
+	if remainingStr != "" {
+		if rem, err := strconv.Atoi(remainingStr); err == nil {
+			remaining = rem
+			hasValidData = true
+		} else {
+			slog.Warn("failed to parse X-Ratelimit-Remaining header",
+				"header_value", remainingStr,
+				"error", err,
+				"endpoint", endpoint)
+		}
+	}
+
+	// Parse used requests
+	if usedStr != "" {
+		if u, err := strconv.Atoi(usedStr); err == nil {
+			used = u
+		} else {
+			slog.Warn("failed to parse X-Ratelimit-Used header",
+				"header_value", usedStr,
+				"error", err,
+				"endpoint", endpoint)
+		}
+	}
+
+	// Parse reset timestamp
+	if resetStr != "" {
+		if resetInt, err := strconv.ParseInt(resetStr, 10, 64); err == nil {
+			reset = time.Unix(resetInt, 0)
+			hasValidData = true
+		} else {
+			slog.Warn("failed to parse X-Ratelimit-Reset header",
+				"header_value", resetStr,
+				"error", err,
+				"endpoint", endpoint)
+		}
+	}
+
+	// Only update rate limiter if we have at least remaining or reset data
+	if hasValidData {
+		c.rateLimiter.UpdateLimitWithUsed(remaining, used, reset)
+		slog.Debug("rate limit headers processed",
+			"remaining", remaining,
+			"used", used,
+			"reset", reset,
+			"endpoint", endpoint)
+	}
+}
+
+// requestJSON performs an HTTP request and decodes the JSON response into the provided result
+func (c *Client) requestJSON(ctx context.Context, method, endpoint string, result any) error {
+	resp, err := c.request(ctx, method, endpoint)
+	if err != nil {
+		return fmt.Errorf("client.requestJSON: request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if err := json.NewDecoder(resp.Body).Decode(result); err != nil {
+		return fmt.Errorf("client.requestJSON: decoding JSON response failed for %s %s: %w", method, endpoint, err)
+	}
+
+	return nil
+}
+
 // request performs an HTTP request with rate limiting, retry logic, and error handling
 func (c *Client) request(ctx context.Context, method, endpoint string) (*http.Response, error) {
 	if err := c.Auth.EnsureValidToken(ctx); err != nil {
@@ -159,15 +238,8 @@ func (c *Client) request(ctx context.Context, method, endpoint string) (*http.Re
 			return nil, lastError
 		}
 
-		// Update rate limit based on response headers
-		if remaining := resp.Header.Get("X-Ratelimit-Remaining"); remaining != "" {
-			if rem, err := strconv.Atoi(remaining); err == nil {
-				resetStr := resp.Header.Get("X-Ratelimit-Reset")
-				resetInt, _ := strconv.ParseInt(resetStr, 10, 64)
-				reset := time.Unix(resetInt, 0)
-				c.rateLimiter.UpdateLimit(rem, reset)
-			}
-		}
+		// Parse and update rate limit based on response headers
+		c.updateRateLimitFromHeaders(resp.Header, endpoint)
 
 		// Check if the response is successful
 		if resp.StatusCode == http.StatusOK {
@@ -234,15 +306,9 @@ func (c *Client) getComments(ctx context.Context, subreddit, postID string, opts
 	base := fmt.Sprintf("/r/%s/comments/%s", subreddit, postID)
 	endpoint := BuildEndpoint(base, params)
 
-	resp, err := c.request(ctx, "GET", endpoint)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
 	var data []any
-	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-		return nil, fmt.Errorf("client.getComments: decoding response failed: %w", err)
+	if err := c.requestJSON(ctx, "GET", endpoint, &data); err != nil {
+		return nil, fmt.Errorf("client.getComments: %w", err)
 	}
 
 	return data, nil
@@ -261,36 +327,55 @@ func (c *Client) getPosts(ctx context.Context, subreddit string, opts ...PostOpt
 		opt(params)
 	}
 
-	var allPosts []Post
+	// Extract pagination options from params
 	limit := 0
 	if limitStr, ok := params["limit"]; ok {
 		limit, _ = strconv.Atoi(limitStr)
 	}
 
-	for {
-		posts, nextAfter, err := c.getPostsPage(ctx, subreddit, params)
-		if err != nil {
-			return nil, err
+	initialAfter := params["after"]
+
+	// Create fetch function that uses current parameters
+	fetchPage := func(ctx context.Context, after string) ([]Post, string, error) {
+		// Create a copy of params for this request
+		requestParams := make(map[string]string)
+		for k, v := range params {
+			requestParams[k] = v
 		}
 
-		allPosts = append(allPosts, posts...)
-
-		// Stop if we've reached the desired limit
-		if limit > 0 && len(allPosts) >= limit {
-			allPosts = allPosts[:limit]
-			break
+		// Override the after parameter
+		if after != "" {
+			requestParams["after"] = after
+		} else {
+			// Remove after parameter if empty (for first request)
+			delete(requestParams, "after")
 		}
 
-		// Stop if there are no more pages or if we got no posts in this page
-		if nextAfter == "" || len(posts) == 0 {
-			break
-		}
-
-		// Update the after parameter for the next request
-		params["after"] = nextAfter
+		return c.getPostsPage(ctx, subreddit, requestParams)
 	}
 
-	return allPosts, nil
+	// Configure pagination options
+	paginationOpts := PaginationOptions{
+		Limit:       limit,
+		PageSize:    100,
+		StopOnEmpty: true,
+	}
+
+	// Handle initial after token if provided
+	if initialAfter != "" {
+		// Modify fetch function to use initial after for first call
+		firstCall := true
+		originalFetchPage := fetchPage
+		fetchPage = func(ctx context.Context, after string) ([]Post, string, error) {
+			if firstCall {
+				firstCall = false
+				return originalFetchPage(ctx, initialAfter)
+			}
+			return originalFetchPage(ctx, after)
+		}
+	}
+
+	return PaginateAll(ctx, fetchPage, paginationOpts)
 }
 
 // getPostsPage fetches a single page of posts from a subreddit
@@ -298,15 +383,9 @@ func (c *Client) getPostsPage(ctx context.Context, subreddit string, params map[
 	base := fmt.Sprintf("/r/%s.json", subreddit)
 	endpoint := BuildEndpoint(base, params)
 
-	resp, err := c.request(ctx, "GET", endpoint)
-	if err != nil {
-		return nil, "", err
-	}
-	defer resp.Body.Close()
-
 	var data map[string]any
-	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-		return nil, "", fmt.Errorf("client.getPostsPage: decoding response failed: %w", err)
+	if err := c.requestJSON(ctx, "GET", endpoint, &data); err != nil {
+		return nil, "", fmt.Errorf("client.getPostsPage: %w", err)
 	}
 
 	return parsePosts(data, c)

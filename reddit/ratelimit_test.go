@@ -315,6 +315,144 @@ var _ = Describe("RateLimiter", func() {
 		})
 	})
 
+	Describe("UpdateLimitWithUsed", func() {
+		BeforeEach(func() {
+			rateLimiter = reddit.NewRateLimiter(60, 5) // Start with default values
+		})
+
+		Context("when remaining and used requests are provided", func() {
+			It("updates rate based on remaining requests and reset time", func() {
+				future := time.Now().Add(10 * time.Minute)
+				remaining := 100
+				used := 20
+
+				rateLimiter.UpdateLimitWithUsed(remaining, used, future)
+
+				// Should calculate rate as 100 requests / 600 seconds = ~0.167 RPS = 10 RPM
+				rpm, burst := rateLimiter.GetConfig()
+				Expect(rpm).To(BeNumerically("~", 10, 1.0))
+				Expect(burst).To(Equal(5)) // Capped at maximum of 5
+			})
+
+			It("handles zero used requests", func() {
+				future := time.Now().Add(5 * time.Minute)
+				remaining := 50
+				used := 0
+
+				rateLimiter.UpdateLimitWithUsed(remaining, used, future)
+
+				rpm, burst := rateLimiter.GetConfig()
+				// 50 requests / 300 seconds = ~0.167 RPS = 10 RPM
+				Expect(rpm).To(BeNumerically("~", 10, 1.0))
+				Expect(burst).To(Equal(5))
+			})
+
+			It("handles high used requests", func() {
+				future := time.Now().Add(1 * time.Minute)
+				remaining := 10
+				used := 90
+
+				rateLimiter.UpdateLimitWithUsed(remaining, used, future)
+
+				rpm, burst := rateLimiter.GetConfig()
+				// 10 requests / 60 seconds = ~0.167 RPS = 10 RPM
+				Expect(rpm).To(BeNumerically("~", 10, 1.0))
+				Expect(burst).To(Equal(1)) // remaining/10 = 1
+			})
+		})
+
+		Context("when remaining requests is 0", func() {
+			It("sets very low rate limit regardless of used value", func() {
+				future := time.Now().Add(5 * time.Minute)
+				remaining := 0
+				used := 60
+
+				rateLimiter.UpdateLimitWithUsed(remaining, used, future)
+
+				rpm, burst := rateLimiter.GetConfig()
+				Expect(rpm).To(Equal(6.0)) // 0.1 RPS = 6 RPM
+				Expect(burst).To(Equal(1))
+			})
+		})
+
+		Context("when remaining requests is negative", func() {
+			It("sets very low rate limit", func() {
+				future := time.Now().Add(5 * time.Minute)
+				remaining := -5
+				used := 65
+
+				rateLimiter.UpdateLimitWithUsed(remaining, used, future)
+
+				rpm, burst := rateLimiter.GetConfig()
+				Expect(rpm).To(Equal(6.0)) // 0.1 RPS = 6 RPM
+				Expect(burst).To(Equal(1))
+			})
+		})
+
+		Context("when reset time is in the past", func() {
+			It("does not update the limits", func() {
+				// Get current config
+				originalRPM, originalBurst := rateLimiter.GetConfig()
+
+				// Try to update with past reset time
+				past := time.Now().Add(-5 * time.Minute)
+				rateLimiter.UpdateLimitWithUsed(100, 20, past)
+
+				// Config should remain unchanged
+				rpm, burst := rateLimiter.GetConfig()
+				Expect(rpm).To(Equal(originalRPM))
+				Expect(burst).To(Equal(originalBurst))
+			})
+		})
+
+		Context("edge cases with burst calculations", func() {
+			It("handles large remaining counts with used value", func() {
+				future := time.Now().Add(1 * time.Hour)
+				remaining := 1000
+				used := 500
+
+				rateLimiter.UpdateLimitWithUsed(remaining, used, future)
+
+				_, burst := rateLimiter.GetConfig()
+				Expect(burst).To(Equal(5)) // Should be capped at 5
+			})
+
+			It("handles very short time windows with used value", func() {
+				future := time.Now().Add(1 * time.Second)
+				remaining := 10
+				used := 5
+
+				rateLimiter.UpdateLimitWithUsed(remaining, used, future)
+
+				rpm, burst := rateLimiter.GetConfig()
+				// 10 requests / 1 second = 10 RPS = 600 RPM
+				Expect(rpm).To(BeNumerically("~", 600, 1))
+				Expect(burst).To(Equal(1)) // remaining/10 = 10/10 = 1
+			})
+		})
+
+		Context("compatibility with original UpdateLimit", func() {
+			It("produces same results when called with UpdateLimit", func() {
+				future := time.Now().Add(10 * time.Minute)
+				remaining := 75
+
+				// Use original method
+				rateLimiter1 := reddit.NewRateLimiter(60, 5)
+				rateLimiter1.UpdateLimit(remaining, future)
+				rpm1, burst1 := rateLimiter1.GetConfig()
+
+				// Use new method with used=0
+				rateLimiter2 := reddit.NewRateLimiter(60, 5)
+				rateLimiter2.UpdateLimitWithUsed(remaining, 0, future)
+				rpm2, burst2 := rateLimiter2.GetConfig()
+
+				// Use BeNumerically for floating point comparison with tolerance
+				Expect(rpm1).To(BeNumerically("~", rpm2, 0.1))
+				Expect(burst1).To(Equal(burst2))
+			})
+		})
+	})
+
 	Describe("integration tests", func() {
 		BeforeEach(func() {
 			rateLimiter = reddit.NewRateLimiter(60, 3)

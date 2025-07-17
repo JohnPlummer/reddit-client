@@ -49,16 +49,30 @@ func (r *RateLimiter) Reserve() *rate.Reservation {
 
 // UpdateLimit updates the rate limit based on the server response
 func (r *RateLimiter) UpdateLimit(remaining int, reset time.Time) {
+	r.UpdateLimitWithUsed(remaining, 0, reset)
+}
+
+// UpdateLimitWithUsed updates the rate limit based on the server response including used requests
+func (r *RateLimiter) UpdateLimitWithUsed(remaining, used int, reset time.Time) {
 	if remaining <= 0 {
 		// If we're out of requests, set a very low limit
 		r.limiter.SetLimit(0.1) // One request every 10 seconds
 		r.limiter.SetBurst(1)
+		slog.Debug("rate limit exhausted, setting very low limit",
+			"remaining", remaining,
+			"used", used,
+			"reset", reset)
 		return
 	}
 
 	// Calculate new rate based on remaining requests and reset time
 	duration := time.Until(reset)
 	if duration <= 0 {
+		slog.Debug("rate limit reset time in past, skipping update",
+			"remaining", remaining,
+			"used", used,
+			"reset", reset,
+			"duration", duration)
 		return
 	}
 
@@ -75,6 +89,14 @@ func (r *RateLimiter) UpdateLimit(remaining int, reset time.Time) {
 		burst = 1
 	}
 	r.limiter.SetBurst(burst)
+
+	slog.Debug("updated rate limit from headers",
+		"remaining", remaining,
+		"used", used,
+		"reset", reset,
+		"duration", duration,
+		"new_rps", rps,
+		"new_burst", burst)
 }
 
 // GetConfig returns the current rate limit configuration

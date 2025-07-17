@@ -2,7 +2,9 @@ package reddit_test
 
 import (
 	"context"
+	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -536,6 +538,504 @@ var _ = Describe("Client", func() {
 
 			Expect(result1).To(Equal(result2))
 			Expect(result2).To(Equal(result3))
+		})
+	})
+
+	Describe("JSON Response Handling", func() {
+		var client *reddit.Client
+		var subreddit *reddit.Subreddit
+
+		BeforeEach(func() {
+			var err error
+			client, err = reddit.NewClient(auth,
+				reddit.WithHTTPClient(mockClient),
+			)
+			Expect(err).NotTo(HaveOccurred())
+			subreddit = reddit.NewSubreddit("golang", client)
+			transport.Reset()
+		})
+
+		Context("when processing valid JSON responses", func() {
+			It("successfully processes subreddit posts JSON", func() {
+				expectedData := map[string]any{
+					"data": map[string]any{
+						"children": []any{
+							map[string]any{
+								"data": map[string]any{
+									"id":    "test123",
+									"title": "Test Post",
+									"url":   "https://example.com",
+								},
+							},
+						},
+						"after": nil,
+					},
+				}
+				transport.AddResponse("/r/golang.json", reddit.CreateJSONResponse(expectedData))
+
+				posts, err := subreddit.GetPosts(context.Background())
+				Expect(err).NotTo(HaveOccurred())
+				Expect(posts).To(HaveLen(1))
+				Expect(posts[0].Title).To(Equal("Test Post"))
+			})
+
+			It("successfully processes comment JSON responses", func() {
+				// First create a post properly through the subreddit
+				postData := map[string]any{
+					"data": map[string]any{
+						"children": []any{
+							map[string]any{
+								"data": map[string]any{
+									"id":        "post123",
+									"title":     "Test Post",
+									"subreddit": "golang",
+									"url":       "https://example.com",
+								},
+							},
+						},
+						"after": nil,
+					},
+				}
+				transport.AddResponse("/r/golang.json", reddit.CreateJSONResponse(postData))
+
+				posts, err := subreddit.GetPosts(context.Background(), reddit.WithSubredditLimit(1))
+				Expect(err).NotTo(HaveOccurred())
+				Expect(posts).To(HaveLen(1))
+
+				// Mock data for comments
+				expectedData := []any{
+					map[string]any{
+						"data": map[string]any{
+							"children": []any{
+								map[string]any{
+									"data": map[string]any{
+										"id":    "post123",
+										"title": "Test Post",
+									},
+								},
+							},
+						},
+					},
+					map[string]any{
+						"data": map[string]any{
+							"children": []any{
+								map[string]any{
+									"data": map[string]any{
+										"id":   "comment123",
+										"body": "Test comment",
+									},
+								},
+							},
+						},
+					},
+				}
+				transport.AddResponse("/r/golang/comments/post123", reddit.CreateJSONResponse(expectedData))
+
+				comments, err := posts[0].GetComments(context.Background())
+				Expect(err).NotTo(HaveOccurred())
+				Expect(comments).To(HaveLen(1))
+			})
+		})
+
+		Context("when handling malformed JSON responses", func() {
+			It("returns descriptive error for malformed subreddit JSON", func() {
+				transport.AddResponse("/r/golang.json", &http.Response{
+					StatusCode: 200,
+					Body:       io.NopCloser(strings.NewReader(`{"invalid": json`)),
+					Header:     make(http.Header),
+				})
+
+				posts, err := subreddit.GetPosts(context.Background())
+				Expect(err).To(HaveOccurred())
+				Expect(posts).To(BeNil())
+				Expect(err.Error()).To(ContainSubstring("decoding JSON response failed"))
+				Expect(err.Error()).To(ContainSubstring("GET /r/golang.json"))
+			})
+
+			It("returns descriptive error for malformed comment JSON", func() {
+				// First create a post properly through the subreddit
+				postData := map[string]any{
+					"data": map[string]any{
+						"children": []any{
+							map[string]any{
+								"data": map[string]any{
+									"id":        "post123",
+									"title":     "Test Post",
+									"subreddit": "golang",
+									"url":       "https://example.com",
+								},
+							},
+						},
+						"after": nil,
+					},
+				}
+				transport.AddResponse("/r/golang.json", reddit.CreateJSONResponse(postData))
+
+				posts, err := subreddit.GetPosts(context.Background(), reddit.WithSubredditLimit(1))
+				Expect(err).NotTo(HaveOccurred())
+				Expect(posts).To(HaveLen(1))
+
+				// Now set up malformed comment response
+				transport.AddResponse("/r/golang/comments/post123", &http.Response{
+					StatusCode: 200,
+					Body:       io.NopCloser(strings.NewReader(`[{"invalid": json`)),
+					Header:     make(http.Header),
+				})
+
+				comments, err := posts[0].GetComments(context.Background())
+				Expect(err).To(HaveOccurred())
+				Expect(comments).To(BeNil())
+				Expect(err.Error()).To(ContainSubstring("decoding JSON response failed"))
+				Expect(err.Error()).To(ContainSubstring("GET /r/golang/comments/post123"))
+			})
+		})
+
+		Context("when handling empty responses", func() {
+			It("handles empty subreddit responses gracefully", func() {
+				transport.AddResponse("/r/golang.json", &http.Response{
+					StatusCode: 200,
+					Body:       http.NoBody,
+					Header:     make(http.Header),
+				})
+
+				posts, err := subreddit.GetPosts(context.Background())
+				Expect(err).To(HaveOccurred())
+				Expect(posts).To(BeNil())
+				Expect(err.Error()).To(ContainSubstring("decoding JSON response failed"))
+			})
+		})
+	})
+
+	Describe("Rate Limit Header Processing", func() {
+		var client *reddit.Client
+		var subreddit *reddit.Subreddit
+
+		BeforeEach(func() {
+			var err error
+			client, err = reddit.NewClient(auth,
+				reddit.WithHTTPClient(mockClient),
+			)
+			Expect(err).NotTo(HaveOccurred())
+			subreddit = reddit.NewSubreddit("golang", client)
+			transport.Reset()
+		})
+
+		Context("with all rate limit headers present", func() {
+			It("successfully parses and updates rate limiter with all headers", func() {
+				// Create response with all rate limit headers
+				resp := reddit.CreateJSONResponse(map[string]any{
+					"data": map[string]any{
+						"children": []any{},
+						"after":    nil,
+					},
+				})
+				resp.Header = make(http.Header)
+				resp.Header.Set("X-Ratelimit-Remaining", "50")
+				resp.Header.Set("X-Ratelimit-Used", "10")
+				resp.Header.Set("X-Ratelimit-Reset", strconv.FormatInt(time.Now().Add(10*time.Minute).Unix(), 10))
+
+				transport.AddResponse("/r/golang.json", resp)
+
+				posts, err := subreddit.GetPosts(context.Background())
+				Expect(err).NotTo(HaveOccurred())
+				Expect(posts).To(BeEmpty())
+
+				// Verify the request was made
+				callHistory := transport.GetCallHistory()
+				golangCalls := 0
+				for _, call := range callHistory {
+					if strings.Contains(call, "/r/golang.json") {
+						golangCalls++
+					}
+				}
+				Expect(golangCalls).To(Equal(1))
+			})
+		})
+
+		Context("with only remaining and reset headers", func() {
+			It("successfully parses headers without used header", func() {
+				resp := reddit.CreateJSONResponse(map[string]any{
+					"data": map[string]any{
+						"children": []any{},
+						"after":    nil,
+					},
+				})
+				resp.Header = make(http.Header)
+				resp.Header.Set("X-Ratelimit-Remaining", "75")
+				resp.Header.Set("X-Ratelimit-Reset", strconv.FormatInt(time.Now().Add(5*time.Minute).Unix(), 10))
+
+				transport.AddResponse("/r/golang.json", resp)
+
+				posts, err := subreddit.GetPosts(context.Background())
+				Expect(err).NotTo(HaveOccurred())
+				Expect(posts).To(BeEmpty())
+			})
+		})
+
+		Context("with malformed rate limit headers", func() {
+			It("handles invalid remaining header gracefully", func() {
+				resp := reddit.CreateJSONResponse(map[string]any{
+					"data": map[string]any{
+						"children": []any{},
+						"after":    nil,
+					},
+				})
+				resp.Header = make(http.Header)
+				resp.Header.Set("X-Ratelimit-Remaining", "invalid")
+				resp.Header.Set("X-Ratelimit-Used", "5")
+				resp.Header.Set("X-Ratelimit-Reset", strconv.FormatInt(time.Now().Add(10*time.Minute).Unix(), 10))
+
+				transport.AddResponse("/r/golang.json", resp)
+
+				posts, err := subreddit.GetPosts(context.Background())
+				Expect(err).NotTo(HaveOccurred())
+				Expect(posts).To(BeEmpty())
+			})
+
+			It("handles invalid used header gracefully", func() {
+				resp := reddit.CreateJSONResponse(map[string]any{
+					"data": map[string]any{
+						"children": []any{},
+						"after":    nil,
+					},
+				})
+				resp.Header = make(http.Header)
+				resp.Header.Set("X-Ratelimit-Remaining", "30")
+				resp.Header.Set("X-Ratelimit-Used", "not-a-number")
+				resp.Header.Set("X-Ratelimit-Reset", strconv.FormatInt(time.Now().Add(10*time.Minute).Unix(), 10))
+
+				transport.AddResponse("/r/golang.json", resp)
+
+				posts, err := subreddit.GetPosts(context.Background())
+				Expect(err).NotTo(HaveOccurred())
+				Expect(posts).To(BeEmpty())
+			})
+
+			It("handles invalid reset header gracefully", func() {
+				resp := reddit.CreateJSONResponse(map[string]any{
+					"data": map[string]any{
+						"children": []any{},
+						"after":    nil,
+					},
+				})
+				resp.Header = make(http.Header)
+				resp.Header.Set("X-Ratelimit-Remaining", "40")
+				resp.Header.Set("X-Ratelimit-Used", "20")
+				resp.Header.Set("X-Ratelimit-Reset", "invalid-timestamp")
+
+				transport.AddResponse("/r/golang.json", resp)
+
+				posts, err := subreddit.GetPosts(context.Background())
+				Expect(err).NotTo(HaveOccurred())
+				Expect(posts).To(BeEmpty())
+			})
+
+			It("handles all invalid headers gracefully", func() {
+				resp := reddit.CreateJSONResponse(map[string]any{
+					"data": map[string]any{
+						"children": []any{},
+						"after":    nil,
+					},
+				})
+				resp.Header = make(http.Header)
+				resp.Header.Set("X-Ratelimit-Remaining", "invalid")
+				resp.Header.Set("X-Ratelimit-Used", "also-invalid")
+				resp.Header.Set("X-Ratelimit-Reset", "not-a-timestamp")
+
+				transport.AddResponse("/r/golang.json", resp)
+
+				posts, err := subreddit.GetPosts(context.Background())
+				Expect(err).NotTo(HaveOccurred())
+				Expect(posts).To(BeEmpty())
+			})
+		})
+
+		Context("with zero remaining requests", func() {
+			It("handles rate limit exhaustion properly", func() {
+				resp := reddit.CreateJSONResponse(map[string]any{
+					"data": map[string]any{
+						"children": []any{},
+						"after":    nil,
+					},
+				})
+				resp.Header = make(http.Header)
+				resp.Header.Set("X-Ratelimit-Remaining", "0")
+				resp.Header.Set("X-Ratelimit-Used", "60")
+				resp.Header.Set("X-Ratelimit-Reset", strconv.FormatInt(time.Now().Add(10*time.Minute).Unix(), 10))
+
+				transport.AddResponse("/r/golang.json", resp)
+
+				posts, err := subreddit.GetPosts(context.Background())
+				Expect(err).NotTo(HaveOccurred())
+				Expect(posts).To(BeEmpty())
+			})
+
+			It("handles negative remaining requests", func() {
+				resp := reddit.CreateJSONResponse(map[string]any{
+					"data": map[string]any{
+						"children": []any{},
+						"after":    nil,
+					},
+				})
+				resp.Header = make(http.Header)
+				resp.Header.Set("X-Ratelimit-Remaining", "-1")
+				resp.Header.Set("X-Ratelimit-Used", "61")
+				resp.Header.Set("X-Ratelimit-Reset", strconv.FormatInt(time.Now().Add(10*time.Minute).Unix(), 10))
+
+				transport.AddResponse("/r/golang.json", resp)
+
+				posts, err := subreddit.GetPosts(context.Background())
+				Expect(err).NotTo(HaveOccurred())
+				Expect(posts).To(BeEmpty())
+			})
+		})
+
+		Context("with reset time in the past", func() {
+			It("skips rate limit update for past reset time", func() {
+				resp := reddit.CreateJSONResponse(map[string]any{
+					"data": map[string]any{
+						"children": []any{},
+						"after":    nil,
+					},
+				})
+				resp.Header = make(http.Header)
+				resp.Header.Set("X-Ratelimit-Remaining", "30")
+				resp.Header.Set("X-Ratelimit-Used", "10")
+				resp.Header.Set("X-Ratelimit-Reset", strconv.FormatInt(time.Now().Add(-5*time.Minute).Unix(), 10))
+
+				transport.AddResponse("/r/golang.json", resp)
+
+				posts, err := subreddit.GetPosts(context.Background())
+				Expect(err).NotTo(HaveOccurred())
+				Expect(posts).To(BeEmpty())
+			})
+		})
+
+		Context("with no rate limit headers", func() {
+			It("continues normally without rate limit headers", func() {
+				resp := reddit.CreateJSONResponse(map[string]any{
+					"data": map[string]any{
+						"children": []any{},
+						"after":    nil,
+					},
+				})
+				// No rate limit headers set
+
+				transport.AddResponse("/r/golang.json", resp)
+
+				posts, err := subreddit.GetPosts(context.Background())
+				Expect(err).NotTo(HaveOccurred())
+				Expect(posts).To(BeEmpty())
+			})
+		})
+
+		Context("with partial headers", func() {
+			It("processes only remaining header", func() {
+				resp := reddit.CreateJSONResponse(map[string]any{
+					"data": map[string]any{
+						"children": []any{},
+						"after":    nil,
+					},
+				})
+				resp.Header = make(http.Header)
+				resp.Header.Set("X-Ratelimit-Remaining", "25")
+
+				transport.AddResponse("/r/golang.json", resp)
+
+				posts, err := subreddit.GetPosts(context.Background())
+				Expect(err).NotTo(HaveOccurred())
+				Expect(posts).To(BeEmpty())
+			})
+
+			It("processes only reset header", func() {
+				resp := reddit.CreateJSONResponse(map[string]any{
+					"data": map[string]any{
+						"children": []any{},
+						"after":    nil,
+					},
+				})
+				resp.Header = make(http.Header)
+				resp.Header.Set("X-Ratelimit-Reset", strconv.FormatInt(time.Now().Add(8*time.Minute).Unix(), 10))
+
+				transport.AddResponse("/r/golang.json", resp)
+
+				posts, err := subreddit.GetPosts(context.Background())
+				Expect(err).NotTo(HaveOccurred())
+				Expect(posts).To(BeEmpty())
+			})
+
+			It("processes only used header", func() {
+				resp := reddit.CreateJSONResponse(map[string]any{
+					"data": map[string]any{
+						"children": []any{},
+						"after":    nil,
+					},
+				})
+				resp.Header = make(http.Header)
+				resp.Header.Set("X-Ratelimit-Used", "15")
+
+				transport.AddResponse("/r/golang.json", resp)
+
+				posts, err := subreddit.GetPosts(context.Background())
+				Expect(err).NotTo(HaveOccurred())
+				Expect(posts).To(BeEmpty())
+			})
+		})
+
+		Context("rate limit headers with retries", func() {
+			BeforeEach(func() {
+				var err error
+				client, err = reddit.NewClient(auth,
+					reddit.WithHTTPClient(mockClient),
+					reddit.WithRetries(2),
+					reddit.WithRetryDelay(100*time.Millisecond),
+				)
+				Expect(err).NotTo(HaveOccurred())
+				subreddit = reddit.NewSubreddit("golang", client)
+				transport.Reset()
+			})
+
+			It("processes rate limit headers on failed requests", func() {
+				// First response: 429 with rate limit headers
+				firstResp := &http.Response{
+					StatusCode: 429,
+					Body:       http.NoBody,
+					Header:     make(http.Header),
+				}
+				firstResp.Header.Set("X-Ratelimit-Remaining", "0")
+				firstResp.Header.Set("X-Ratelimit-Used", "60")
+				firstResp.Header.Set("X-Ratelimit-Reset", strconv.FormatInt(time.Now().Add(10*time.Minute).Unix(), 10))
+
+				transport.AddResponseToQueue("/r/golang.json", firstResp)
+
+				// Second response: success with different rate limit headers
+				secondResp := reddit.CreateJSONResponse(map[string]any{
+					"data": map[string]any{
+						"children": []any{},
+						"after":    nil,
+					},
+				})
+				secondResp.Header = make(http.Header)
+				secondResp.Header.Set("X-Ratelimit-Remaining", "59")
+				secondResp.Header.Set("X-Ratelimit-Used", "1")
+				secondResp.Header.Set("X-Ratelimit-Reset", strconv.FormatInt(time.Now().Add(10*time.Minute).Unix(), 10))
+
+				transport.AddResponseToQueue("/r/golang.json", secondResp)
+
+				posts, err := subreddit.GetPosts(context.Background())
+				Expect(err).NotTo(HaveOccurred())
+				Expect(posts).To(BeEmpty())
+
+				// Verify both requests were made
+				callHistory := transport.GetCallHistory()
+				golangCalls := 0
+				for _, call := range callHistory {
+					if strings.Contains(call, "/r/golang.json") {
+						golangCalls++
+					}
+				}
+				Expect(golangCalls).To(Equal(2))
+			})
 		})
 	})
 })

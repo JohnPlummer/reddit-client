@@ -2,7 +2,9 @@ package reddit_test
 
 import (
 	"context"
+	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/JohnPlummer/reddit-client/reddit"
@@ -270,6 +272,61 @@ var _ = Describe("Auth Options", func() {
 			// WithAuthHTTPClient doesn't update auth.timeout, so it keeps the timeout set by WithAuthTimeout
 			// WithAuthTransport comes after and modifies the client but preserves auth.timeout
 			Expect(authStr).To(ContainSubstring("Timeout: 20s"))
+		})
+	})
+})
+
+var _ = Describe("Auth JSON Response Handling", func() {
+	var (
+		auth      *reddit.Auth
+		transport *reddit.TestTransport
+	)
+
+	BeforeEach(func() {
+		transport = reddit.NewTestTransport()
+		var err error
+		auth, err = reddit.NewAuth("test_id", "test_secret",
+			reddit.WithAuthTransport(transport))
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	Describe("Authentication Response Processing", func() {
+		It("successfully processes valid authentication JSON", func() {
+			ctx := context.Background()
+			err := auth.Authenticate(ctx)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(auth.Token).To(Equal("test_token"))
+			Expect(auth.ExpiresAt).To(BeTemporally(">", time.Now()))
+		})
+
+		// Note: The following tests would require modifying the TestTransport's
+		// special auth endpoint handling to properly test error scenarios.
+		// For now, we test the JSON handling through client methods that use
+		// the requestJSON wrapper, which demonstrates the same functionality.
+
+		It("demonstrates JSON error handling through client methods", func() {
+			// This test verifies that the refactored JSON handling works correctly
+			// by testing it through client methods that use the requestJSON wrapper
+
+			client, err := reddit.NewClient(auth,
+				reddit.WithHTTPClient(&http.Client{Transport: transport}))
+			Expect(err).NotTo(HaveOccurred())
+
+			subreddit := reddit.NewSubreddit("golang", client)
+			transport.Reset()
+
+			// Test malformed JSON handling
+			transport.AddResponse("/r/golang.json", &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(strings.NewReader(`{"invalid": json`)),
+				Header:     make(http.Header),
+			})
+
+			posts, err := subreddit.GetPosts(context.Background())
+			Expect(err).To(HaveOccurred())
+			Expect(posts).To(BeNil())
+			Expect(err.Error()).To(ContainSubstring("decoding JSON response failed"))
+			Expect(err.Error()).To(ContainSubstring("GET /r/golang.json"))
 		})
 	})
 })

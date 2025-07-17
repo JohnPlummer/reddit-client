@@ -125,42 +125,58 @@ func (p *Post) GetCommentsAfter(ctx context.Context, after *Comment, limit int) 
 		return nil, fmt.Errorf("post.GetCommentsAfter: post has no associated client")
 	}
 
-	opts := []CommentOption{WithCommentLimit(100)}
-	if after != nil {
-		opts = append(opts, WithCommentAfter(after))
-	}
+	// Create fetch function for comments pagination
+	fetchPage := func(ctx context.Context, afterToken string) ([]Comment, string, error) {
+		opts := []CommentOption{WithCommentLimit(100)}
 
-	var allComments []Comment
-	for {
+		// Add after parameter if provided
+		if afterToken != "" {
+			// Convert afterToken back to Comment for WithCommentAfter
+			// The afterToken should be in the format "t1_<id>"
+			if len(afterToken) > 3 && afterToken[:3] == "t1_" {
+				afterComment := &Comment{ID: afterToken[3:]} // Remove "t1_" prefix
+				opts = append(opts, WithCommentAfter(afterComment))
+			}
+		}
+
 		data, err := p.client.getComments(ctx, p.Subreddit, p.ID, opts...)
 		if err != nil {
-			return nil, fmt.Errorf("post.GetCommentsAfter: fetching comments failed: %w", err)
+			return nil, "", fmt.Errorf("fetching comments failed: %w", err)
 		}
 
 		comments, err := parseComments(data)
 		if err != nil {
-			return nil, fmt.Errorf("post.GetCommentsAfter: parsing comments failed: %w", err)
+			return nil, "", fmt.Errorf("parsing comments failed: %w", err)
 		}
 
-		allComments = append(allComments, comments...)
-
-		// Stop if we've reached the desired limit
-		if limit > 0 && len(allComments) >= limit {
-			allComments = allComments[:limit]
-			break
+		// Determine next after token
+		var nextAfter string
+		if len(comments) > 0 {
+			lastComment := comments[len(comments)-1]
+			nextAfter = lastComment.Fullname()
 		}
 
-		// Stop if there are no more comments
-		if len(comments) == 0 {
-			break
-		}
-
-		// Update the after parameter for the next request
-		lastComment := comments[len(comments)-1]
-		opts = []CommentOption{WithCommentLimit(100), WithCommentAfter(&lastComment)}
+		return comments, nextAfter, nil
 	}
 
-	return allComments, nil
+	// Extract after token function
+	extractAfter := func(comment Comment) string {
+		return comment.Fullname()
+	}
+
+	// Configure pagination options
+	paginationOpts := PaginationOptions{
+		Limit:       limit,
+		PageSize:    100,
+		StopOnEmpty: true,
+	}
+
+	// Use PaginateAfter if we have an initial comment, otherwise PaginateAll
+	if after != nil {
+		return PaginateAfter(ctx, fetchPage, extractAfter, after, paginationOpts)
+	}
+
+	return PaginateAll(ctx, fetchPage, paginationOpts)
 }
 
 // Fullname returns the Reddit fullname identifier for this post (t3_<id>)

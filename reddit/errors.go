@@ -70,6 +70,15 @@ func IsNotFoundError(err error) bool {
 	return err == ErrNotFound || (errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound)
 }
 
+// IsUnauthorizedError returns true if the error is an unauthorized error
+func IsUnauthorizedError(err error) bool {
+	if err == nil {
+		return false
+	}
+	var apiErr *APIError
+	return err == ErrInvalidCredentials || (errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusUnauthorized)
+}
+
 // IsServerError returns true if the error is a server error
 func IsServerError(err error) bool {
 	if err == nil {
