@@ -21,7 +21,7 @@ run-examples: run-basic run-comprehensive
 # Run tests using Ginkgo
 test:
 	@echo "Running tests..."
-	ginkgo -v ./...
+	GOMAXPROCS_DISABLE_LOG=true ginkgo -v ./...
 
 # Run go mod tidy in root project
 tidy:
@@ -67,7 +67,7 @@ check:
 # Generate coverage report in markdown format
 coverage:
 	@echo "Generating coverage report..."
-	ginkgo -v --coverprofile=coverage.out ./...
+	GOMAXPROCS_DISABLE_LOG=true ginkgo -v --coverprofile=coverage.out ./...
 	@echo "# Coverage Report\n" > coverage.md
 	@echo "| Function | Coverage |" >> coverage.md
 	@echo "|----------|----------|" >> coverage.md
