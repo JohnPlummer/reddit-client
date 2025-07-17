@@ -50,7 +50,7 @@ func (a *Auth) Authenticate(ctx context.Context) error {
 	req, err := http.NewRequestWithContext(ctx, "POST", tokenURL, strings.NewReader(data.Encode()))
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to create auth request", "error", err)
-		return fmt.Errorf("creating auth request: %w", err)
+		return fmt.Errorf("auth.Authenticate: creating request failed: %w", err)
 	}
 
 	req.SetBasicAuth(a.ClientID, a.ClientSecret)
@@ -59,13 +59,13 @@ func (a *Auth) Authenticate(ctx context.Context) error {
 
 	resp, err := a.client.Do(req)
 	if err != nil {
-		return fmt.Errorf("making auth request: %w", err)
+		return fmt.Errorf("auth.Authenticate: making request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("reading response body: %w", err)
+		return fmt.Errorf("auth.Authenticate: reading response body failed: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -74,11 +74,11 @@ func (a *Auth) Authenticate(ctx context.Context) error {
 
 	var tokenResp TokenResponse
 	if err := json.Unmarshal(body, &tokenResp); err != nil {
-		return fmt.Errorf("parsing token response: %w", err)
+		return fmt.Errorf("auth.Authenticate: parsing token response failed: %w", err)
 	}
 
 	if tokenResp.AccessToken == "" {
-		return fmt.Errorf("no access token in response")
+		return fmt.Errorf("auth.Authenticate: no access token in response")
 	}
 
 	a.Token = tokenResp.AccessToken

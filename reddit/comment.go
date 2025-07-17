@@ -22,28 +22,44 @@ func (c Comment) Fullname() string {
 // parseComments extracts comments from the API response
 func parseComments(data []any) ([]Comment, error) {
 	if len(data) < 2 {
-		return nil, fmt.Errorf("unexpected response format")
+		return nil, fmt.Errorf("comment.parseComments: unexpected response format")
 	}
 
 	commentData, ok := data[1].(map[string]any)
 	if !ok {
-		return nil, fmt.Errorf("unexpected response format")
+		return nil, fmt.Errorf("comment.parseComments: unexpected response format")
 	}
 
 	var comments []Comment
-	children := commentData["data"].(map[string]any)["children"].([]any)
+	dataMap, ok := commentData["data"].(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("comment.parseComments: invalid data structure")
+	}
+
+	children, ok := dataMap["children"].([]any)
+	if !ok {
+		return nil, fmt.Errorf("comment.parseComments: missing children array")
+	}
 	now := nowUnix()
 
 	for _, item := range children {
-		commentBody := item.(map[string]any)["data"].(map[string]any)
-		created, _ := commentBody["created_utc"].(float64)
-		comments = append(comments, Comment{
-			Author:     commentBody["author"].(string),
-			Body:       commentBody["body"].(string),
-			Created:    int64(created),
-			ID:         commentBody["id"].(string),
-			IngestedAt: now,
-		})
+		itemMap, ok := item.(map[string]any)
+		if !ok {
+			continue // Skip invalid items
+		}
+
+		commentBody, ok := itemMap["data"].(map[string]any)
+		if !ok {
+			continue // Skip invalid comment data
+		}
+
+		// Use type-safe field extractors
+		comment, err := parseCommentData(commentBody, now)
+		if err != nil {
+			continue // Skip comments with missing essential data
+		}
+
+		comments = append(comments, comment)
 	}
 
 	return comments, nil

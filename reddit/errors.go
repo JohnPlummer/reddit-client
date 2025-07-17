@@ -78,3 +78,32 @@ func IsServerError(err error) bool {
 	var apiErr *APIError
 	return err == ErrServerError || (errors.As(err, &apiErr) && apiErr.StatusCode >= 500)
 }
+
+// IsRetryableError returns true if the error should trigger a retry
+func IsRetryableError(err error) bool {
+	if err == nil {
+		return false
+	}
+	var apiErr *APIError
+	if errors.As(err, &apiErr) {
+		return isRetryableStatusCode(apiErr.StatusCode)
+	}
+	return false
+}
+
+// isRetryableStatusCode checks if a status code should trigger a retry
+func isRetryableStatusCode(statusCode int) bool {
+	switch statusCode {
+	case http.StatusTooManyRequests, // 429
+		http.StatusBadGateway,         // 502
+		http.StatusServiceUnavailable: // 503
+		return true
+	default:
+		return false
+	}
+}
+
+// IsTemporaryError returns true if the error is likely temporary
+func IsTemporaryError(err error) bool {
+	return IsRateLimitError(err) || IsServerError(err) || IsRetryableError(err)
+}

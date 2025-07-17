@@ -63,11 +63,71 @@ func WithLimit(limit int) PostOption {
 	}
 }
 
+// RetryConfig holds configuration for retry behavior
+type RetryConfig struct {
+	MaxRetries        int           // Maximum number of retry attempts (default: 3)
+	BaseDelay         time.Duration // Base delay for exponential backoff (default: 1s)
+	MaxDelay          time.Duration // Maximum delay between retries (default: 8s)
+	JitterFactor      float64       // Jitter factor to add randomness (default: 0.1)
+	RetryableCodes    []int         // HTTP status codes that should trigger retries
+	RespectRetryAfter bool          // Whether to respect Retry-After headers (default: true)
+}
+
+// DefaultRetryConfig returns a default retry configuration
+func DefaultRetryConfig() *RetryConfig {
+	return &RetryConfig{
+		MaxRetries:        3,
+		BaseDelay:         1 * time.Second,
+		MaxDelay:          8 * time.Second,
+		JitterFactor:      0.1,
+		RetryableCodes:    []int{429, 502, 503},
+		RespectRetryAfter: true,
+	}
+}
+
+// WithRetryConfig sets the retry configuration for the client
+func WithRetryConfig(config *RetryConfig) ClientOption {
+	return func(c *Client) {
+		if config == nil {
+			config = DefaultRetryConfig()
+		}
+		c.retryConfig = config
+	}
+}
+
+// WithRetries enables retry logic with the specified maximum number of retries
+func WithRetries(maxRetries int) ClientOption {
+	return func(c *Client) {
+		if c.retryConfig == nil {
+			c.retryConfig = DefaultRetryConfig()
+		}
+		c.retryConfig.MaxRetries = maxRetries
+	}
+}
+
+// WithRetryDelay sets the base delay for exponential backoff
+func WithRetryDelay(baseDelay time.Duration) ClientOption {
+	return func(c *Client) {
+		if c.retryConfig == nil {
+			c.retryConfig = DefaultRetryConfig()
+		}
+		c.retryConfig.BaseDelay = baseDelay
+	}
+}
+
+// WithNoRetries disables retry logic
+func WithNoRetries() ClientOption {
+	return func(c *Client) {
+		c.retryConfig = nil
+	}
+}
+
 // DefaultOptions returns the default set of options
 func DefaultOptions() []ClientOption {
 	return []ClientOption{
 		WithUserAgent("golang:reddit-client:v1.0"),
 		WithRateLimit(60, 5), // Default to 60 requests per minute with burst of 5
 		WithTimeout(10 * time.Second),
+		WithRetryConfig(DefaultRetryConfig()), // Enable retries by default
 	}
 }

@@ -59,36 +59,23 @@ func (p Post) String() string {
 func parsePost(item any, client commentGetter) (Post, error) {
 	postMap, ok := item.(map[string]any)
 	if !ok {
-		return Post{}, fmt.Errorf("invalid post format")
+		return Post{}, fmt.Errorf("post.parsePost: invalid post format")
 	}
 
 	data, ok := postMap["data"].(map[string]any)
 	if !ok {
-		return Post{}, fmt.Errorf("invalid post data format")
+		return Post{}, fmt.Errorf("post.parsePost: invalid post data format")
 	}
 
-	// Safely extract fields with type assertions
-	title, _ := data["title"].(string)
-	selfText, _ := data["selftext"].(string)
-	url, _ := data["url"].(string)
-	created, _ := data["created_utc"].(float64)
-	subreddit, _ := data["subreddit"].(string)
-	id, _ := data["id"].(string)
-	score, _ := data["score"].(float64)
-	commentCount, _ := data["num_comments"].(float64)
+	// Use type-safe field extractors
+	post, err := parsePostData(data)
+	if err != nil {
+		return Post{}, fmt.Errorf("post.parsePost: %w", err)
+	}
 
-	return Post{
-		Title:        title,
-		SelfText:     selfText,
-		URL:          url,
-		Created:      int64(created),
-		Subreddit:    subreddit,
-		ID:           id,
-		RedditScore:  int(score),
-		ContentScore: 0, // Initialize to 0, will be set by content analysis
-		CommentCount: int(commentCount),
-		client:       client,
-	}, nil
+	// Set the client for comment fetching
+	post.client = client
+	return post, nil
 }
 
 // parsePosts extracts posts and the pagination cursor from API response.
@@ -97,12 +84,12 @@ func parsePosts(data map[string]any, client commentGetter) ([]Post, string, erro
 
 	listing, ok := data["data"].(map[string]any)
 	if !ok {
-		return nil, "", fmt.Errorf("invalid response format: missing data object")
+		return nil, "", fmt.Errorf("post.parsePosts: invalid response format missing data object")
 	}
 
 	children, ok := listing["children"].([]any)
 	if !ok {
-		return nil, "", fmt.Errorf("invalid response format: missing children array")
+		return nil, "", fmt.Errorf("post.parsePosts: invalid response format missing children array")
 	}
 
 	for _, item := range children {
@@ -120,12 +107,12 @@ func parsePosts(data map[string]any, client commentGetter) ([]Post, string, erro
 // GetComments fetches comments for this post with optional filters
 func (p *Post) GetComments(ctx context.Context, opts ...CommentOption) ([]Comment, error) {
 	if p.client == nil {
-		return nil, fmt.Errorf("post has no associated client")
+		return nil, fmt.Errorf("post.GetComments: post has no associated client")
 	}
 
 	data, err := p.client.getComments(ctx, p.Subreddit, p.ID, opts...)
 	if err != nil {
-		return nil, fmt.Errorf("fetching comments: %w", err)
+		return nil, fmt.Errorf("post.GetComments: fetching comments failed: %w", err)
 	}
 	return parseComments(data)
 }
@@ -135,7 +122,7 @@ func (p *Post) GetComments(ctx context.Context, opts ...CommentOption) ([]Commen
 // Set limit to 0 to fetch all available comments (use with caution).
 func (p *Post) GetCommentsAfter(ctx context.Context, after *Comment, limit int) ([]Comment, error) {
 	if p.client == nil {
-		return nil, fmt.Errorf("post has no associated client")
+		return nil, fmt.Errorf("post.GetCommentsAfter: post has no associated client")
 	}
 
 	opts := []CommentOption{WithCommentLimit(100)}
@@ -147,12 +134,12 @@ func (p *Post) GetCommentsAfter(ctx context.Context, after *Comment, limit int) 
 	for {
 		data, err := p.client.getComments(ctx, p.Subreddit, p.ID, opts...)
 		if err != nil {
-			return nil, fmt.Errorf("fetching comments after: %w", err)
+			return nil, fmt.Errorf("post.GetCommentsAfter: fetching comments failed: %w", err)
 		}
 
 		comments, err := parseComments(data)
 		if err != nil {
-			return nil, fmt.Errorf("parsing comments after: %w", err)
+			return nil, fmt.Errorf("post.GetCommentsAfter: parsing comments failed: %w", err)
 		}
 
 		allComments = append(allComments, comments...)

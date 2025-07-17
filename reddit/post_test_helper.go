@@ -34,7 +34,7 @@ var _ TestCommentGetter = (*testCommentGetter)(nil)
 // getComments implements the commentGetter interface for testing
 func (m *testCommentGetter) getComments(ctx context.Context, subreddit, postID string, opts ...CommentOption) ([]any, error) {
 	m.callCount++
-	
+
 	if m.commentsErr != nil {
 		return nil, m.commentsErr
 	}

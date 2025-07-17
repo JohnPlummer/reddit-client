@@ -667,7 +667,7 @@ var _ = Describe("Subreddit", func() {
 				posts, err := subreddit.GetPostsAfter(ctx, afterPost, 0)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(posts).To(HaveLen(2))
-				
+
 				// Should make 3 calls: 1 for auth, 2 for API requests
 				Expect(transport.GetCallCount()).To(Equal(3))
 				history := transport.GetCallHistory()

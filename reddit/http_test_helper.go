@@ -28,9 +28,9 @@ func NewTestTransport() *TestTransport {
 type TestTransport struct {
 	responses     map[string]*http.Response
 	err           error
-	callCount     int                        // Track number of calls
-	callHistory   []string                   // Track which paths were called
-	errorOnCall   map[int]error             // Map from call number to error
+	callCount     int                         // Track number of calls
+	callHistory   []string                    // Track which paths were called
+	errorOnCall   map[int]error               // Map from call number to error
 	responseQueue map[string][]*http.Response // Queue of responses for a path
 }
 
@@ -41,12 +41,12 @@ var _ HTTPTransport = (*TestTransport)(nil)
 func (m *TestTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	m.callCount++
 	m.callHistory = append(m.callHistory, req.URL.Path+"?"+req.URL.RawQuery)
-	
+
 	// Check for call-specific errors
 	if err, hasErr := m.errorOnCall[m.callCount]; hasErr {
 		return nil, err
 	}
-	
+
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -68,7 +68,7 @@ func (m *TestTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	if queue, hasQueue := m.responseQueue[pathKey]; hasQueue && len(queue) > 0 {
 		resp := queue[0]
 		m.responseQueue[pathKey] = queue[1:] // Remove first response from queue
-		
+
 		// Return a new response with a fresh body
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
@@ -78,7 +78,7 @@ func (m *TestTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		return &http.Response{
 			StatusCode: resp.StatusCode,
 			Body:       io.NopCloser(bytes.NewReader(body)),
-			Header:     make(http.Header),
+			Header:     resp.Header,
 		}, nil
 	}
 
@@ -93,7 +93,7 @@ func (m *TestTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		return &http.Response{
 			StatusCode: resp.StatusCode,
 			Body:       io.NopCloser(bytes.NewReader(body)),
-			Header:     make(http.Header),
+			Header:     resp.Header,
 		}, nil
 	}
 

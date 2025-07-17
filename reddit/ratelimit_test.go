@@ -36,7 +36,7 @@ var _ = Describe("RateLimiter", func() {
 			It("returns false when burst is exhausted", func() {
 				// First request should be allowed
 				Expect(rateLimiter.Allow()).To(BeTrue())
-				
+
 				// Subsequent requests should be denied immediately
 				Expect(rateLimiter.Allow()).To(BeFalse())
 				Expect(rateLimiter.Allow()).To(BeFalse())
@@ -51,7 +51,7 @@ var _ = Describe("RateLimiter", func() {
 			It("allows burst requests but denies subsequent requests", func() {
 				// First request should be allowed due to burst capacity
 				Expect(rateLimiter.Allow()).To(BeTrue())
-				
+
 				// Subsequent requests should be denied
 				Expect(rateLimiter.Allow()).To(BeFalse())
 				Expect(rateLimiter.Allow()).To(BeFalse())
@@ -116,7 +116,7 @@ var _ = Describe("RateLimiter", func() {
 
 				// Cancel the delayed reservation
 				reservation2.Cancel()
-				
+
 				// The cancel should have freed up capacity
 				// (Note: exact behavior may vary, but reservation should be valid)
 				newReservation := rateLimiter.Reserve()
@@ -131,7 +131,7 @@ var _ = Describe("RateLimiter", func() {
 
 			It("handles burst correctly", func() {
 				reservations := make([]*rate.Reservation, 10)
-				
+
 				// First 10 reservations should be immediate
 				for i := 0; i < 10; i++ {
 					reservations[i] = rateLimiter.Reserve()
@@ -160,7 +160,7 @@ var _ = Describe("RateLimiter", func() {
 				// Should calculate rate as 100 requests / 600 seconds = ~0.167 RPS = 10 RPM
 				rpm, burst := rateLimiter.GetConfig()
 				Expect(rpm).To(BeNumerically("~", 10, 1.0)) // Allow more tolerance
-				Expect(burst).To(Equal(5)) // Capped at maximum of 5, not 10
+				Expect(burst).To(Equal(5))                  // Capped at maximum of 5, not 10
 			})
 
 			It("caps burst at 5 when calculated burst exceeds maximum", func() {
@@ -199,7 +199,7 @@ var _ = Describe("RateLimiter", func() {
 		Context("when remaining requests is 0", func() {
 			It("sets very low rate limit", func() {
 				future := time.Now().Add(5 * time.Minute)
-				
+
 				rateLimiter.UpdateLimit(0, future)
 
 				rpm, burst := rateLimiter.GetConfig()
@@ -211,7 +211,7 @@ var _ = Describe("RateLimiter", func() {
 		Context("when remaining requests is negative", func() {
 			It("sets very low rate limit", func() {
 				future := time.Now().Add(5 * time.Minute)
-				
+
 				rateLimiter.UpdateLimit(-5, future)
 
 				rpm, burst := rateLimiter.GetConfig()
@@ -224,7 +224,7 @@ var _ = Describe("RateLimiter", func() {
 			It("does not update the limits", func() {
 				// Get current config
 				originalRPM, originalBurst := rateLimiter.GetConfig()
-				
+
 				// Try to update with past reset time
 				past := time.Now().Add(-5 * time.Minute)
 				rateLimiter.UpdateLimit(100, past)
@@ -240,7 +240,7 @@ var _ = Describe("RateLimiter", func() {
 			It("does not update the limits", func() {
 				// Get current config
 				originalRPM, originalBurst := rateLimiter.GetConfig()
-				
+
 				// Try to update with current time
 				now := time.Now()
 				rateLimiter.UpdateLimit(100, now)
@@ -294,7 +294,7 @@ var _ = Describe("RateLimiter", func() {
 
 				// Should allow first request
 				Expect(rateLimiter.Allow()).To(BeTrue())
-				
+
 				// Should deny subsequent requests due to low rate
 				Expect(rateLimiter.Allow()).To(BeFalse())
 			})
@@ -351,7 +351,7 @@ var _ = Describe("RateLimiter", func() {
 				if rateLimiter.Allow() {
 					allowed++
 				}
-				
+
 				reservation := rateLimiter.Reserve()
 				if reservation.Delay() == 0 {
 					immediate++
@@ -359,9 +359,9 @@ var _ = Describe("RateLimiter", func() {
 			}
 
 			// Should have some consistent behavior
-			Expect(allowed).To(BeNumerically("<=", 3)) // At most burst size
+			Expect(allowed).To(BeNumerically("<=", 3))   // At most burst size
 			Expect(immediate).To(BeNumerically(">=", 0)) // Should have at least some immediate reservations
-			
+
 			// Total calls should be consistent with what we made
 			Expect(allowed + immediate).To(BeNumerically(">=", 3)) // At least burst size worth of immediate responses
 		})

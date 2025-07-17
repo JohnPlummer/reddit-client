@@ -52,7 +52,7 @@ var _ = Describe("Post", func() {
 			testMock.SetupError(expectedErr)
 
 			comments, err := post.GetComments(ctx)
-			Expect(err).To(MatchError("fetching comments: API error"))
+			Expect(err).To(MatchError("post.GetComments: fetching comments failed: API error"))
 			Expect(errors.Is(err, expectedErr)).To(BeTrue())
 			Expect(comments).To(BeNil())
 		})
@@ -100,7 +100,7 @@ var _ = Describe("Post", func() {
 			testMock.SetupError(expectedErr)
 
 			moreComments, err := post.GetCommentsAfter(ctx, &firstComment, 1)
-			Expect(err).To(MatchError("fetching comments after: API error"))
+			Expect(err).To(MatchError("post.GetCommentsAfter: fetching comments failed: API error"))
 			Expect(errors.Is(err, expectedErr)).To(BeTrue())
 			Expect(moreComments).To(BeNil())
 		})
@@ -114,7 +114,7 @@ var _ = Describe("Post", func() {
 				// Setup first page with comments
 				firstPageData := []any{
 					map[string]any{}, // First element (post data)
-					map[string]any{   // Second element (comments data)
+					map[string]any{ // Second element (comments data)
 						"data": map[string]any{
 							"children": []any{
 								map[string]any{
@@ -133,7 +133,7 @@ var _ = Describe("Post", func() {
 				// Setup empty page after c1
 				emptyPageData := []any{
 					map[string]any{}, // First element (post data)
-					map[string]any{   // Second element (comments data)
+					map[string]any{ // Second element (comments data)
 						"data": map[string]any{
 							"children": []any{}, // Empty children array
 						},
@@ -151,7 +151,7 @@ var _ = Describe("Post", func() {
 			It("handles pagination with nil after parameter", func() {
 				commentsData := []any{
 					map[string]any{}, // First element (post data)
-					map[string]any{   // Second element (comments data)
+					map[string]any{ // Second element (comments data)
 						"data": map[string]any{
 							"children": []any{
 								map[string]any{
@@ -185,7 +185,7 @@ var _ = Describe("Post", func() {
 				// First page with 2 comments
 				firstPageData := []any{
 					map[string]any{}, // First element (post data)
-					map[string]any{   // Second element (comments data)
+					map[string]any{ // Second element (comments data)
 						"data": map[string]any{
 							"children": []any{
 								map[string]any{
@@ -211,7 +211,7 @@ var _ = Describe("Post", func() {
 				// Second page with 2 more comments
 				secondPageData := []any{
 					map[string]any{}, // First element (post data)
-					map[string]any{   // Second element (comments data)
+					map[string]any{ // Second element (comments data)
 						"data": map[string]any{
 							"children": []any{
 								map[string]any{
@@ -247,7 +247,7 @@ var _ = Describe("Post", func() {
 				// Single comment available
 				singleCommentData := []any{
 					map[string]any{}, // First element (post data)
-					map[string]any{   // Second element (comments data)
+					map[string]any{ // Second element (comments data)
 						"data": map[string]any{
 							"children": []any{
 								map[string]any{
@@ -266,7 +266,7 @@ var _ = Describe("Post", func() {
 				// Empty second page
 				emptyPageData := []any{
 					map[string]any{}, // First element (post data)
-					map[string]any{   // Second element (comments data)
+					map[string]any{ // Second element (comments data)
 						"data": map[string]any{
 							"children": []any{},
 						},
@@ -285,7 +285,7 @@ var _ = Describe("Post", func() {
 				// Multiple comments available
 				multiCommentData := []any{
 					map[string]any{}, // First element (post data)
-					map[string]any{   // Second element (comments data)
+					map[string]any{ // Second element (comments data)
 						"data": map[string]any{
 							"children": []any{
 								map[string]any{
@@ -327,7 +327,7 @@ var _ = Describe("Post", func() {
 				// First page works
 				firstPageData := []any{
 					map[string]any{}, // First element (post data)
-					map[string]any{   // Second element (comments data)
+					map[string]any{ // Second element (comments data)
 						"data": map[string]any{
 							"children": []any{
 								map[string]any{
@@ -357,7 +357,7 @@ var _ = Describe("Post", func() {
 				// Setup single comment
 				singleCommentData := []any{
 					map[string]any{}, // First element (post data)
-					map[string]any{   // Second element (comments data)
+					map[string]any{ // Second element (comments data)
 						"data": map[string]any{
 							"children": []any{
 								map[string]any{
@@ -376,7 +376,7 @@ var _ = Describe("Post", func() {
 				// Empty next page
 				emptyPageData := []any{
 					map[string]any{}, // First element (post data)
-					map[string]any{   // Second element (comments data)
+					map[string]any{ // Second element (comments data)
 						"data": map[string]any{
 							"children": []any{},
 						},
@@ -395,7 +395,7 @@ var _ = Describe("Post", func() {
 				// First page
 				firstPageData := []any{
 					map[string]any{}, // First element (post data)
-					map[string]any{   // Second element (comments data)
+					map[string]any{ // Second element (comments data)
 						"data": map[string]any{
 							"children": []any{
 								map[string]any{
@@ -414,7 +414,7 @@ var _ = Describe("Post", func() {
 				// Second page
 				secondPageData := []any{
 					map[string]any{}, // First element (post data)
-					map[string]any{   // Second element (comments data)
+					map[string]any{ // Second element (comments data)
 						"data": map[string]any{
 							"children": []any{
 								map[string]any{
@@ -433,7 +433,7 @@ var _ = Describe("Post", func() {
 				// Empty third page
 				emptyPageData := []any{
 					map[string]any{}, // First element (post data)
-					map[string]any{   // Second element (comments data)
+					map[string]any{ // Second element (comments data)
 						"data": map[string]any{
 							"children": []any{},
 						},
@@ -453,7 +453,7 @@ var _ = Describe("Post", func() {
 				// First page with duplicated comment in API response
 				firstPageData := []any{
 					map[string]any{}, // First element (post data)
-					map[string]any{   // Second element (comments data)
+					map[string]any{ // Second element (comments data)
 						"data": map[string]any{
 							"children": []any{
 								map[string]any{
@@ -479,7 +479,7 @@ var _ = Describe("Post", func() {
 				// Set up empty page to stop pagination after duplicates
 				emptyPageData := []any{
 					map[string]any{}, // First element (post data)
-					map[string]any{   // Second element (comments data)
+					map[string]any{ // Second element (comments data)
 						"data": map[string]any{
 							"children": []any{},
 						},
