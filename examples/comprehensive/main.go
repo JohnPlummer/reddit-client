@@ -92,15 +92,23 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Create a new client
+	// Create a rate limit hook for monitoring
+	rateLimitHook := &reddit.LoggingRateLimitHook{}
+
+	// Create a new client with rate limit monitoring
 	client, err := reddit.NewClient(auth,
 		reddit.WithUserAgent("MyRedditBot/1.0"),
 		reddit.WithRateLimit(cfg.rateLimit, cfg.rateBurst),
+		reddit.WithRateLimitHook(rateLimitHook),
 	)
 	if err != nil {
 		slog.Error("failed to create client", "error", err)
 		os.Exit(1)
 	}
+
+	slog.Info("client created with rate limit monitoring enabled",
+		"rate_limit", cfg.rateLimit,
+		"rate_burst", cfg.rateBurst)
 
 	// Create a subreddit instance
 	subreddit := reddit.NewSubreddit(cfg.subreddit, client)

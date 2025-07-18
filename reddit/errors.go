@@ -116,3 +116,21 @@ func isRetryableStatusCode(statusCode int) bool {
 func IsTemporaryError(err error) bool {
 	return IsRateLimitError(err) || IsServerError(err) || IsRetryableError(err)
 }
+
+// IsCircuitBreakerError returns true if the error is a circuit breaker error
+func IsCircuitBreakerError(err error) bool {
+	if err == nil {
+		return false
+	}
+	var cbErr *CircuitBreakerError
+	return errors.As(err, &cbErr)
+}
+
+// IsCircuitBreakerOpen returns true if the error is due to an open circuit breaker
+func IsCircuitBreakerOpen(err error) bool {
+	if err == nil {
+		return false
+	}
+	var cbErr *CircuitBreakerError
+	return errors.As(err, &cbErr) && cbErr.State == CircuitOpen
+}

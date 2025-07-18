@@ -2,6 +2,7 @@ package reddit
 
 import (
 	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -161,4 +162,30 @@ func CreateJSONResponse(data any) *http.Response {
 		StatusCode: http.StatusOK,
 		Body:       io.NopCloser(bytes.NewReader(body)),
 	}
+}
+
+// CreateGzippedJSONResponse creates an HTTP response with gzipped JSON body
+func CreateGzippedJSONResponse(data any) *http.Response {
+	jsonBody, err := json.Marshal(data)
+	if err != nil {
+		panic(err)
+	}
+
+	// Compress the JSON
+	var buf bytes.Buffer
+	gzWriter := gzip.NewWriter(&buf)
+	if _, err := gzWriter.Write(jsonBody); err != nil {
+		panic(err)
+	}
+	if err := gzWriter.Close(); err != nil {
+		panic(err)
+	}
+
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(bytes.NewReader(buf.Bytes())),
+		Header:     make(http.Header),
+	}
+	resp.Header.Set("Content-Encoding", "gzip")
+	return resp
 }

@@ -1,4 +1,4 @@
-.PHONY: run-basic run-comprehensive run-examples test tidy tidy-examples tidy-all lint lint-examples lint-all check coverage install-mockgen generate-mocks
+.PHONY: run-basic run-comprehensive run-performance-tuning run-examples test tidy tidy-examples tidy-all lint lint-examples lint-all check coverage install-mockgen generate-mocks
 
 # Run the basic example
 run-basic:
@@ -15,8 +15,13 @@ run-comprehensive:
 		--max-pages=1 \
 		--log-level=info
 
-# Run both examples
-run-examples: run-basic run-comprehensive
+# Run the performance tuning example
+run-performance-tuning:
+	@echo "Running performance tuning example..."
+	cd examples/performance-tuning && go run main.go
+
+# Run all examples
+run-examples: run-basic run-comprehensive run-performance-tuning
 
 # Run tests using Ginkgo
 test:
@@ -33,6 +38,7 @@ tidy-examples:
 	@echo "Running go mod tidy in examples..."
 	cd examples/basic && go mod tidy
 	cd examples/comprehensive && go mod tidy
+	cd examples/performance-tuning && go mod tidy
 
 # Run go mod tidy everywhere
 tidy-all: tidy tidy-examples
@@ -47,6 +53,7 @@ lint-examples:
 	@echo "Running go fmt in examples..."
 	cd examples/basic && go fmt ./...
 	cd examples/comprehensive && go fmt ./...
+	cd examples/performance-tuning && go fmt ./...
 
 # Run go fmt everywhere
 lint-all: lint lint-examples
