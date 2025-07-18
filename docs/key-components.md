@@ -15,6 +15,7 @@ The Reddit client library is built around four main components that work togethe
 - OAuth2 client credentials flow implementation
 - Automatic token refresh when expired
 - Secure credential management with obfuscation
+- JSON wrapper for improved response handling
 - Configurable timeouts and HTTP client
 
 **Main Types**:
@@ -43,7 +44,10 @@ type Auth struct {
 **Key Features**:
 
 - HTTP request management with automatic authentication
-- Rate limiting with Reddit header-based adjustments
+- Intelligent rate limiting with header-based adjustments
+- Circuit breaker pattern for resilience
+- Retry logic with exponential backoff
+- Request/response interceptors
 - Structured error handling and logging
 - Context support for timeouts and cancellation
 
@@ -134,16 +138,41 @@ type Subreddit struct {
 
 ### 5. Rate Limiting (`ratelimit.go`)
 
-**Purpose**: Implements token bucket rate limiting with Reddit API integration.
+**Purpose**: Implements intelligent rate limiting with Reddit API integration.
 
 **Features**:
 
-- Token bucket algorithm
-- Dynamic adjustment based on Reddit headers
-- Context-aware waiting
-- Burst support for short-term peaks
+- Token bucket algorithm with burst support
+- Dynamic adjustment based on Reddit X-Ratelimit headers
+- Context-aware waiting with cancellation support
+- Performance metrics tracking
+- Configurable burst and refill rates
 
-### 6. Error Handling (`errors.go`)
+### 6. Circuit Breaker (`circuit_breaker.go`)
+
+**Purpose**: Implements circuit breaker pattern for improved resilience.
+
+**Features**:
+
+- Three states: Closed, Open, Half-Open
+- Configurable failure thresholds and timeouts
+- Automatic recovery attempts
+- Request success/failure tracking
+- Thread-safe operation
+
+### 7. Pagination (`pagination.go`)
+
+**Purpose**: Generic pagination utilities for Reddit API responses.
+
+**Features**:
+
+- Generic pagination interface `Paginator[T]`
+- Automatic multi-page fetching
+- Configurable page size and limits
+- Context-aware cancellation
+- Memory-efficient streaming
+
+### 8. Error Handling (`errors.go`)
 
 **Purpose**: Comprehensive error types and helper functions.
 
@@ -154,14 +183,27 @@ type Subreddit struct {
 - `ErrNotFound` - Resource not found
 - `ErrServerError` - Reddit server error
 - `ErrBadRequest` - Invalid request parameters
+- `CircuitBreakerError` - Circuit breaker errors (struct type)
 
 **Helper Functions**:
 
 - `IsRateLimitError(err)` - Check if error is rate limiting
 - `IsNotFoundError(err)` - Check if error is not found
 - `IsServerError(err)` - Check if error is server-related
+- `IsRetryableError(err)` - Check if error should trigger retry
 
-### 7. Configuration Options
+### 9. URL Utilities (`utils.go`)
+
+**Purpose**: URL building and validation utilities.
+
+**Features**:
+
+- Safe URL construction and validation
+- Query parameter handling
+- Reddit API endpoint builders
+- Path sanitization and encoding
+
+### 10. Configuration Options
 
 #### Client Options (`client_options.go`)
 
@@ -171,6 +213,10 @@ WithUserAgent(userAgent string)
 WithRateLimit(requestsPerMinute, burstSize int)
 WithTimeout(timeout time.Duration)
 WithHTTPClient(client *http.Client)
+WithCircuitBreaker(config *CircuitBreakerConfig)
+WithRetryConfig(maxRetries int, baseDelay time.Duration)
+WithRequestInterceptor(interceptor func(*http.Request))
+WithResponseInterceptor(interceptor func(*http.Response))
 ```
 
 #### Subreddit Options (`subreddit_options.go`)

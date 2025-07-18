@@ -23,11 +23,14 @@ This library simplifies interaction with Reddit's API by providing:
 - **OAuth2 Authentication**: Automatic token management with refresh capabilities
 - **Subreddit Operations**: Fetch posts from any subreddit with filtering and sorting
 - **Comment Retrieval**: Get comments for posts with configurable depth and limits
-- **Pagination Support**: Efficient handling of large result sets
-- **Rate Limiting**: Automatic rate limiting to respect Reddit's API constraints
+- **Pagination Support**: Efficient handling of large result sets with generic pagination utilities
+- **Rate Limiting**: Intelligent rate limiting with header-based adjustments
+- **Circuit Breaker**: Built-in circuit breaker pattern for resilience
+- **Error Handling**: Comprehensive error types with retry logic and backoff strategies
 - **Structured Logging**: Built-in logging using Go's `slog` package
 - **Context Support**: Full context support for timeouts and cancellation
 - **Interface-Based Design**: Easy mocking and testing capabilities
+- **Performance Monitoring**: Built-in metrics and performance tracking
 
 ### Architecture Highlights
 
@@ -49,15 +52,18 @@ This library simplifies interaction with Reddit's API by providing:
 
 ```text
 reddit/
-├── auth.go           # OAuth2 authentication
-├── client.go         # Main client implementation
-├── post.go           # Post data model and operations
-├── comment.go        # Comment data model and operations
-├── subreddit.go      # Subreddit operations
-├── errors.go         # Error definitions and helpers
-├── ratelimit.go      # Rate limiting implementation
-├── *_options.go      # Functional options for configuration
-└── mocks/           # Generated mocks for testing
+├── auth.go                # OAuth2 authentication
+├── client.go              # Main client implementation  
+├── post.go                # Post data model and operations
+├── comment.go             # Comment data model and operations
+├── subreddit.go           # Subreddit operations
+├── errors.go              # Error definitions and helpers
+├── ratelimit.go           # Rate limiting implementation
+├── circuit_breaker.go     # Circuit breaker implementation
+├── pagination.go          # Generic pagination utilities
+├── utils.go               # URL utilities and helpers
+├── *_options.go           # Functional options for configuration
+└── mocks/                # Generated mocks for testing
 ```
 
 ### Dependencies
@@ -70,7 +76,9 @@ reddit/
 
 ### Examples
 
-The project includes two comprehensive examples:
+The project includes comprehensive examples demonstrating various features:
 
 - **Basic Example**: Simple post fetching demonstration
 - **Comprehensive Example**: Advanced usage with all features
+- **Performance Tuning Example**: Performance optimization techniques
+- **Interceptors Example**: Request/response interceptors and middleware

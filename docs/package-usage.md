@@ -127,6 +127,25 @@ reddit.WithTimeout(10*time.Second)
 
 // Use custom HTTP client
 reddit.WithHTTPClient(customClient)
+
+// Configure circuit breaker with config struct
+reddit.WithCircuitBreaker(&reddit.CircuitBreakerConfig{
+    FailureThreshold: 5,
+    Timeout:         30 * time.Second,
+})
+
+// Configure retry behavior (max retries, base delay)
+reddit.WithRetryConfig(3, 1*time.Second)
+
+// Add request interceptor for custom logic
+reddit.WithRequestInterceptor(func(req *http.Request) {
+    req.Header.Set("X-Custom-Header", "value")
+})
+
+// Add response interceptor for custom logic
+reddit.WithResponseInterceptor(func(resp *http.Response) {
+    // Custom response processing
+})
 ```
 
 ## Fetching Posts
