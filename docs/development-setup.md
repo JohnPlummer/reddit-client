@@ -100,7 +100,13 @@ make run-basic
 # Run comprehensive example
 make run-comprehensive
 
-# Run both examples
+# Run interceptors example
+make run-interceptors
+
+# Run performance tuning example
+make run-performance-tuning
+
+# Run all examples
 make run-examples
 ```
 

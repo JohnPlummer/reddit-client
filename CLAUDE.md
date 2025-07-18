@@ -19,7 +19,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - `make run-basic` - Run the basic example
 - `make run-comprehensive` - Run the comprehensive example with default parameters
-- `make run-examples` - Run both examples
+- `make run-interceptors` - Run the interceptors example
+- `make run-performance-tuning` - Run the performance tuning example
+- `make run-examples` - Run all examples
 
 ### Maintenance
 
@@ -124,7 +126,7 @@ This project includes comprehensive documentation in the `docs/` directory:
 - **Basic Usage**: See [Package Usage](docs/package-usage.md) for complete examples
 - **Configuration**: Uses functional options pattern throughout
 - **Testing**: Ginkgo BDD framework with generated mocks
-- **Examples**: See `examples/` directory for basic and comprehensive examples
+- **Examples**: See `examples/` directory for basic, comprehensive, interceptors, and performance-tuning examples
 
 ### Development Workflow
 

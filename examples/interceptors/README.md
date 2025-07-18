@@ -20,17 +20,19 @@ This example demonstrates how to use the Reddit client's request and response in
 ## Setup
 
 1. **Get Reddit API Credentials**:
-   - Go to https://www.reddit.com/prefs/apps
+   - Go to <https://www.reddit.com/prefs/apps>
    - Create a new "script" application
    - Note the client ID (under the app name) and secret
 
 2. **Set Environment Variables**:
+
    ```bash
    export REDDIT_CLIENT_ID="your_client_id_here"
    export REDDIT_CLIENT_SECRET="your_client_secret_here"
    ```
 
 3. **Install Dependencies**:
+
    ```bash
    go mod tidy
    ```
@@ -45,7 +47,7 @@ go run main.go
 
 The example will demonstrate various interceptor capabilities:
 
-```
+```text
 === Reddit Client Interceptors Demo ===
 
 1. Basic Logging Interceptors:
