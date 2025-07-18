@@ -42,14 +42,27 @@ For each document:
 - **Provide meaningful content** rather than just placeholder text
 - **Include examples** and practical information
 
-### 4. CLAUDE.md Configuration
+### 4. CLAUDE.md Configuration and Deduplication
 
-Create a CLAUDE.md file that:
+**IMPORTANT: Before creating or modifying CLAUDE.md, check for existing CLAUDE.md files:**
 
-- References all generated documentation
-- Includes project context and key information
-- Provides development commands and workflows
-- Serves as a central reference for future AI assistance
+1. **Check for existing CLAUDE.md** in the project root
+2. **If CLAUDE.md exists:**
+   - Analyze the existing content for information that should be moved to documentation
+   - Identify duplicated information that exists in both CLAUDE.md and the new docs
+   - Display proposed changes to the user, explaining:
+     - What information will be moved from CLAUDE.md to specific documentation files
+     - What information will be replaced with references to the new documentation
+     - Why these changes improve the documentation structure (avoiding duplication)
+   - Ask the user for approval before proceeding with CLAUDE.md modifications
+   - Wait for user confirmation before continuing
+
+3. **Create or update CLAUDE.md** to:
+   - Reference all generated documentation instead of duplicating information
+   - Include only project-specific context that doesn't belong in standard docs
+   - Provide development commands and workflows
+   - Serve as a central reference that points to the appropriate documentation files
+   - Avoid duplicating information that now exists in the docs/ directory
 
 ## Key Information to Extract
 

@@ -17,6 +17,7 @@ You are tasked with analyzing the current project documentation to assess its qu
 - Categorize documents by purpose (setup, reference, guides, etc.)
 - Note last update dates and freshness
 - Identify missing standard documentation
+- **Check for CLAUDE.md file** and analyze for duplicated information with docs/
 
 ### 2. Content Analysis
 
@@ -37,7 +38,16 @@ Identify missing documentation:
 - **Process docs**: Deployment, troubleshooting, contributing
 - **Technical docs**: Architecture, database schema, etc.
 
-### 4. Quality Assessment
+### 4. CLAUDE.md Deduplication Analysis
+
+**If CLAUDE.md exists:**
+
+- **Identify duplicated information** between CLAUDE.md and docs/ directory
+- **Analyze information placement** - what belongs in CLAUDE.md vs docs/
+- **Assess reference structure** - does CLAUDE.md properly reference docs instead of duplicating?
+- **Recommend consolidation** - suggest moving duplicated content to appropriate docs and updating CLAUDE.md to reference them
+
+### 5. Quality Assessment
 
 Rate documentation on:
 
@@ -75,6 +85,7 @@ Rate documentation on:
 - **CODE_OF_CONDUCT.md**: Community standards
 - **CHANGELOG.md**: Version history and changes
 - **SECURITY.md**: Security policies and reporting
+- **CLAUDE.md**: AI assistant context and project reference (check for duplication with docs/)
 
 ### Quality Metrics
 
@@ -234,5 +245,6 @@ For each document reviewed:
 - **Fix**: Specific issues to resolve
 - **Enhance**: Quality improvements
 - **Automate**: Process improvements
+- **Deduplicate**: Remove duplicated information between CLAUDE.md and docs/
 
 Remember: The goal is to provide actionable insights that will help improve the documentation's value to the development team.

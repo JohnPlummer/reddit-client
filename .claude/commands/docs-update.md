@@ -50,6 +50,27 @@ Create comprehensive changelog with:
 - **Dependencies**: Updated packages and versions
 - **Performance**: Improvements and optimizations
 
+### 5. CLAUDE.md Deduplication Check
+
+**IMPORTANT: Before updating documentation, check for CLAUDE.md deduplication:**
+
+1. **Check for existing CLAUDE.md** in the project root
+2. **If CLAUDE.md exists:**
+   - Analyze the existing content for information that duplicates what's in the updated documentation
+   - Identify outdated information in CLAUDE.md that should be removed or updated
+   - Display proposed changes to the user, explaining:
+     - What information will be removed from CLAUDE.md because it's now in documentation
+     - What information will be replaced with references to the updated documentation
+     - Why these changes improve the documentation structure (avoiding duplication)
+   - Ask the user for approval before proceeding with CLAUDE.md modifications
+   - Wait for user confirmation before continuing
+
+3. **Update CLAUDE.md** to:
+   - Reference updated documentation instead of duplicating information
+   - Remove outdated information that's now covered in the docs/ directory
+   - Update references to point to the correct documentation files
+   - Maintain only project-specific context that doesn't belong in standard docs
+
 ## Information to Extract from Git
 
 ### Commit Analysis
