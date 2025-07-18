@@ -21,6 +21,14 @@ Thumbs.db
 *.dll
 *.dylib
 
+# Go binaries (without extensions)
+examples/*/performance-*
+examples/*/*-test
+examples/*/main
+examples/basic/basic
+examples/comprehensive/comprehensive
+examples/interceptors/interceptors
+
 # Go modules and dependencies
 go.sum
 go.work
