@@ -1,5 +1,9 @@
 # Reddit Client
 
+[![Go Version](https://img.shields.io/github/go-mod/go-version/JohnPlummer/reddit-client)](https://golang.org/doc/devel/release.html)
+[![Release](https://img.shields.io/github/v/release/JohnPlummer/reddit-client)](https://github.com/JohnPlummer/reddit-client/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 A simple and reliable Reddit API client written in Go. This client supports reading posts and comments from Reddit using their OAuth2 API.
 
 ## Features
@@ -14,7 +18,13 @@ A simple and reliable Reddit API client written in Go. This client supports read
 ## Installation
 
 ```bash
-go get github.com/JohnPlummer/reddit-client
+go get github.com/JohnPlummer/reddit-client@v0.9.0
+```
+
+Or for the latest version:
+
+```bash
+go get github.com/JohnPlummer/reddit-client@latest
 ```
 
 ## Quick Start
