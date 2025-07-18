@@ -68,11 +68,11 @@ func main() {
 	// 3. Low-throughput configuration (conservative settings)
 	slog.Info("=== Testing Low-Throughput Configuration ===")
 	lowThroughputConfig := &reddit.TransportConfig{
-		MaxIdleConns:        10,  // Low total idle connections
-		MaxIdleConnsPerHost: 2,   // Very conservative per-host connections
+		MaxIdleConns:        10,               // Low total idle connections
+		MaxIdleConnsPerHost: 2,                // Very conservative per-host connections
 		IdleConnTimeout:     30 * time.Second, // Shorter timeout
 		DisableKeepAlives:   false,
-		MaxConnsPerHost:     5,   // Limit total connections per host
+		MaxConnsPerHost:     5, // Limit total connections per host
 	}
 
 	lowThroughputClient, err := reddit.NewClient(auth,
@@ -88,17 +88,17 @@ func main() {
 	// 4. High-throughput configuration (optimized for performance)
 	slog.Info("=== Testing High-Throughput Configuration ===")
 	highThroughputConfig := &reddit.TransportConfig{
-		MaxIdleConns:        200, // High total idle connections
-		MaxIdleConnsPerHost: 20,  // More connections per host
+		MaxIdleConns:        200,               // High total idle connections
+		MaxIdleConnsPerHost: 20,                // More connections per host
 		IdleConnTimeout:     120 * time.Second, // Longer timeout to reuse connections
-		DisableKeepAlives:   false, // Always use keep-alives
-		MaxConnsPerHost:     0,   // No limit on total connections
+		DisableKeepAlives:   false,             // Always use keep-alives
+		MaxConnsPerHost:     0,                 // No limit on total connections
 	}
 
 	highThroughputClient, err := reddit.NewClient(auth,
 		reddit.WithUserAgent("HighThroughputExample/1.0"),
 		reddit.WithTransportConfig(highThroughputConfig),
-		reddit.WithRateLimit(100, 10), // Higher rate limit
+		reddit.WithRateLimit(100, 10),      // Higher rate limit
 		reddit.WithTimeout(30*time.Second), // Longer timeout for reliability
 	)
 	if err != nil {
